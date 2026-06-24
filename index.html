@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MedQR — Ficha Médica de Emergencia</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    /* ── TOKENS ── */
+    :root {
+      --red:       #C0392B;
+      --red-dark:  #962d22;
+      --red-light: #fdf2f1;
+      --ink:       #1a1a1a;
+      --ink-mid:   #4a4a4a;
+      --ink-light: #888;
+      --rule:      #e0e0e0;
+      --bg:        #f7f6f3;
+      --white:     #ffffff;
+      --radius:    10px;
+      --shadow:    0 2px 14px rgba(0,0,0,.08);
+    }
+
+    /* ── RESET ── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 16px; }
+    body {
+      font-family: 'Georgia', 'Times New Roman', serif;
+      background: var(--bg);
+      color: var(--ink);
+      min-height: 100vh;
+    }
+
+    /* ── HEADER ── */
+    header {
+      background: var(--red);
+      color: var(--white);
+      padding: 18px 24px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .header-cross {
+      width: 36px; height: 36px;
+      background: var(--white);
+      border-radius: 4px;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+    }
+    .header-cross svg { width: 22px; height: 22px; }
+    header h1 {
+      font-size: 1.25rem;
+      font-weight: bold;
+      letter-spacing: .02em;
+      line-height: 1.2;
+    }
+    header p { font-size: .8rem; opacity: .85; font-family: sans-serif; margin-top: 2px; }
+
+    /* ── PRIVACY BANNER ── */
+    .privacy-banner {
+      background: #eaf4ea;
+      border-left: 4px solid #4caf50;
+      margin: 20px auto;
+      max-width: 640px;
+      padding: 12px 16px;
+      border-radius: 0 var(--radius) var(--radius) 0;
+      font-family: sans-serif;
+      font-size: .82rem;
+      color: #2e5e2e;
+      line-height: 1.5;
+    }
+
+    /* ── WRAPPER ── */
+    .app { max-width: 640px; margin: 0 auto; padding: 0 16px 60px; }
+
+    /* ── SCREEN TOGGLE ── */
+    .screen { display: none; }
+    .screen.active { display: block; }
+
+    /* ── PROGRESS BAR ── */
+    .progress-wrap {
+      margin: 24px 0 8px;
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .progress-step {
+      flex: 1;
+      height: 5px;
+      border-radius: 3px;
+      background: var(--rule);
+      transition: background .3s;
+    }
+    .progress-step.done { background: var(--red); }
+    .progress-label {
+      font-family: sans-serif;
+      font-size: .78rem;
+      color: var(--ink-light);
+      margin-bottom: 18px;
+    }
+
+    /* ── STEP HEADING ── */
+    .step-head {
+      border-left: 4px solid var(--red);
+      padding-left: 12px;
+      margin-bottom: 24px;
+    }
+    .step-head h2 {
+      font-size: 1.15rem;
+      font-weight: bold;
+      color: var(--ink);
+    }
+    .step-head p {
+      font-family: sans-serif;
+      font-size: .82rem;
+      color: var(--ink-mid);
+      margin-top: 3px;
+    }
+
+    /* ── FORM FIELDS ── */
+    .field { margin-bottom: 20px; }
+    label {
+      display: block;
+      font-family: sans-serif;
+      font-size: .84rem;
+      font-weight: 600;
+      color: var(--ink);
+      margin-bottom: 6px;
+    }
+    label .req { color: var(--red); margin-left: 2px; }
+    label .hint {
+      font-weight: 400;
+      color: var(--ink-light);
+      font-size: .78rem;
+      display: block;
+      margin-top: 1px;
+    }
+    input[type="text"],
+    input[type="date"],
+    input[type="tel"],
+    select,
+    textarea {
+      width: 100%;
+      padding: 11px 13px;
+      border: 1.5px solid var(--rule);
+      border-radius: var(--radius);
+      font-size: .95rem;
+      font-family: sans-serif;
+      color: var(--ink);
+      background: var(--white);
+      transition: border-color .2s;
+      appearance: none;
+      -webkit-appearance: none;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--red);
+      box-shadow: 0 0 0 3px rgba(192,57,43,.12);
+    }
+    textarea { resize: vertical; min-height: 80px; }
+
+    /* radio group */
+    .radio-group { display: flex; gap: 10px; flex-wrap: wrap; }
+    .radio-group label {
+      font-weight: 400;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+      background: var(--white);
+      border: 1.5px solid var(--rule);
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: .88rem;
+      transition: border-color .2s, background .2s;
+    }
+    .radio-group input[type="radio"] { accent-color: var(--red); width: 16px; height: 16px; }
+    .radio-group label:has(input:checked) {
+      border-color: var(--red);
+      background: var(--red-light);
+    }
+
+    /* field pair */
+    .field-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    @media (max-width: 440px) { .field-pair { grid-template-columns: 1fr; } }
+
+    /* ── BUTTONS ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 14px 28px;
+      border: none;
+      border-radius: var(--radius);
+      font-family: sans-serif;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .2s, transform .1s;
+      text-decoration: none;
+    }
+    .btn:active { transform: scale(.98); }
+    .btn-primary { background: var(--red); color: var(--white); }
+    .btn-primary:hover { background: var(--red-dark); }
+    .btn-secondary {
+      background: var(--white);
+      color: var(--ink);
+      border: 1.5px solid var(--rule);
+    }
+    .btn-secondary:hover { border-color: #aaa; }
+    .btn-big {
+      width: 100%;
+      padding: 18px;
+      font-size: 1.05rem;
+      border-radius: 12px;
+      margin-bottom: 14px;
+    }
+    .btn-green { background: #2d8a2d; color: var(--white); }
+    .btn-green:hover { background: #246824; }
+    .btn-blue { background: #1a5fa8; color: var(--white); }
+    .btn-blue:hover { background: #154d8a; }
+
+    .nav-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 28px;
+      gap: 12px;
+    }
+    .nav-row .btn { flex: 1; }
+
+    /* ── CARD (output) ── */
+    #output-screen { padding-top: 20px; }
+    .output-title {
+      font-size: 1.2rem;
+      font-weight: bold;
+      margin-bottom: 6px;
+    }
+    .output-sub {
+      font-family: sans-serif;
+      font-size: .84rem;
+      color: var(--ink-mid);
+      margin-bottom: 24px;
+    }
+
+    /* wallet card preview */
+    #wallet-card {
+      background: var(--white);
+      border: 2px solid var(--ink);
+      border-radius: 12px;
+      padding: 18px;
+      max-width: 380px;
+      margin: 0 auto 28px;
+      box-shadow: var(--shadow);
+      position: relative;
+    }
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1.5px solid var(--rule);
+      padding-bottom: 10px;
+      margin-bottom: 12px;
+    }
+    .card-cross {
+      width: 28px; height: 28px;
+      background: var(--red);
+      border-radius: 4px;
+      display: grid;
+      place-items: center;
+      flex-shrink: 0;
+    }
+    .card-cross svg { width: 18px; height: 18px; }
+    .card-title { font-size: .85rem; font-weight: bold; line-height: 1.2; }
+    .card-subtitle { font-size: .72rem; color: var(--ink-mid); font-family: sans-serif; }
+    .card-body { display: flex; gap: 14px; align-items: flex-start; }
+    #qr-container { flex-shrink: 0; }
+    #qr-container canvas, #qr-container img { display: block; border-radius: 6px; }
+    .card-info { flex: 1; font-family: sans-serif; font-size: .72rem; line-height: 1.7; }
+    .card-info .name {
+      font-size: .88rem;
+      font-weight: bold;
+      color: var(--ink);
+      margin-bottom: 4px;
+      font-family: Georgia, serif;
+    }
+    .card-info .row { color: var(--ink-mid); }
+    .card-info .row strong { color: var(--ink); }
+    .card-info .allergy-row {
+      margin-top: 6px;
+      background: #fff3f3;
+      border: 1px solid #f8c8c8;
+      border-radius: 5px;
+      padding: 3px 7px;
+      color: var(--red);
+      font-weight: 600;
+    }
+    .card-scan-hint {
+      text-align: center;
+      font-family: sans-serif;
+      font-size: .66rem;
+      color: var(--ink-light);
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px solid var(--rule);
+    }
+
+    /* lockscreen preview */
+    #lockscreen-card {
+      background: linear-gradient(160deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%);
+      border-radius: 32px;
+      padding: 40px 28px 36px;
+      max-width: 220px;
+      margin: 0 auto 28px;
+      text-align: center;
+      color: var(--white);
+      box-shadow: 0 8px 32px rgba(0,0,0,.35);
+      display: none;
+    }
+    #lockscreen-card.active { display: block; }
+    .ls-time { font-size: 2.6rem; font-weight: 300; letter-spacing: .03em; margin-bottom: 2px; }
+    .ls-date { font-size: .75rem; opacity: .7; font-family: sans-serif; margin-bottom: 18px; }
+    .ls-alert {
+      background: rgba(255,255,255,.12);
+      backdrop-filter: blur(8px);
+      border-radius: 16px;
+      padding: 14px 12px;
+    }
+    .ls-alert-title {
+      font-size: .65rem;
+      font-weight: 700;
+      letter-spacing: .1em;
+      opacity: .8;
+      font-family: sans-serif;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .ls-cross {
+      width: 36px; height: 36px;
+      background: var(--red);
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      margin: 0 auto 8px;
+    }
+    .ls-cross svg { width: 20px; height: 20px; }
+    #ls-qr { display: flex; justify-content: center; margin: 10px 0 8px; }
+    #ls-qr canvas, #ls-qr img { border-radius: 8px; }
+    .ls-name { font-size: .8rem; font-weight: 700; margin-bottom: 2px; }
+    .ls-scan { font-size: .62rem; opacity: .65; font-family: sans-serif; }
+
+    /* action buttons */
+    .action-section { margin-top: 6px; }
+    .action-section h3 {
+      font-family: sans-serif;
+      font-size: .82rem;
+      font-weight: 600;
+      color: var(--ink-mid);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 12px;
+    }
+    .toggle-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+    .toggle-row .btn { flex: 1; padding: 10px; font-size: .88rem; }
+    .toggle-row .btn.active-view { background: var(--red); color: var(--white); }
+    .toggle-row .btn:not(.active-view) { background: var(--white); color: var(--ink); border: 1.5px solid var(--rule); }
+
+    /* restart */
+    .restart-row { text-align: center; margin-top: 24px; }
+    .restart-row button {
+      background: none;
+      border: none;
+      font-family: sans-serif;
+      font-size: .82rem;
+      color: var(--ink-light);
+      cursor: pointer;
+      text-decoration: underline;
+    }
+
+    /* ── PRINT STYLES ── */
+    @media print {
+      body * { visibility: hidden; }
+      #print-zone, #print-zone * { visibility: visible; }
+      #print-zone {
+        position: fixed;
+        top: 0; left: 0;
+        width: 100vw;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+      }
+      #wallet-card {
+        border: 2px solid #000;
+        box-shadow: none;
+        max-width: 360px;
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-cross">
+    <svg viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect x="9" y="2" width="4" height="18" rx="1" fill="#C0392B"/>
+      <rect x="2" y="9" width="18" height="4" rx="1" fill="#C0392B"/>
+    </svg>
+  </div>
+  <div>
+    <h1>MedQR — Ficha Médica de Emergencia</h1>
+    <p>Genera tu código QR con información médica para primeros auxilios</p>
+  </div>
+</header>
+
+<div class="app">
+
+  <div class="privacy-banner">
+    🔒 <strong>Tu privacidad está protegida.</strong> Tu información <em>nunca sale de tu dispositivo</em>. El código QR se genera completamente en tu navegador, sin servidores ni cuentas.
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SCREEN 1 — PASO 1: Identificación
+  ══════════════════════════════════════════ -->
+  <div id="step-1" class="screen active">
+    <div class="progress-wrap">
+      <div class="progress-step done" id="p1"></div>
+      <div class="progress-step" id="p2"></div>
+      <div class="progress-step" id="p3"></div>
+      <div class="progress-step" id="p4"></div>
+    </div>
+    <p class="progress-label">Paso 1 de 4</p>
+
+    <div class="step-head">
+      <h2>Identificación personal</h2>
+      <p>Información básica para identificarte en caso de emergencia.</p>
+    </div>
+
+    <div class="field">
+      <label>Nombre completo <span class="req">*</span></label>
+      <input type="text" id="nombre" placeholder="Ej. Juan García López" />
+    </div>
+
+    <div class="field-pair">
+      <div class="field">
+        <label>Fecha de nacimiento <span class="req">*</span></label>
+        <input type="date" id="fecha_nac" />
+      </div>
+      <div class="field">
+        <label>Tipo de sangre</label>
+        <select id="tipo_sangre">
+          <option value="">— No sé —</option>
+          <option>A+</option><option>A−</option>
+          <option>B+</option><option>B−</option>
+          <option>AB+</option><option>AB−</option>
+          <option>O+</option><option>O−</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="nav-row">
+      <button class="btn btn-primary" onclick="goTo(2)">Siguiente →</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SCREEN 2 — PASO 2: Historial Médico
+  ══════════════════════════════════════════ -->
+  <div id="step-2" class="screen">
+    <div class="progress-wrap">
+      <div class="progress-step done"></div>
+      <div class="progress-step done"></div>
+      <div class="progress-step"></div>
+      <div class="progress-step"></div>
+    </div>
+    <p class="progress-label">Paso 2 de 4</p>
+
+    <div class="step-head">
+      <h2>Historial médico</h2>
+      <p>Lo que un paramédico necesita saber para tratarte correctamente.</p>
+    </div>
+
+    <div class="field">
+      <label>
+        Condiciones médicas
+        <span class="hint">Ej. diabetes, hipertensión, epilepsia, cardiopatía, demencia, Parkinson…</span>
+      </label>
+      <textarea id="condiciones" placeholder="Lista tus enfermedades o condiciones crónicas, una por línea."></textarea>
+    </div>
+
+    <div class="field">
+      <label>
+        Medicamentos actuales
+        <span class="hint">Incluye anticoagulantes, insulina, o cualquier medicamento de uso diario.</span>
+      </label>
+      <textarea id="medicamentos" placeholder="Ej. Metformina 500mg, Losartán 50mg, Aspirina 100mg…"></textarea>
+    </div>
+
+    <div class="field">
+      <label>
+        Alergias a medicamentos o alimentos <span class="req">*</span>
+        <span class="hint">MUY IMPORTANTE: lista todo aquello a lo que eres alérgico.</span>
+      </label>
+      <textarea id="alergias" placeholder="Ej. Penicilina, Ibuprofeno, mariscos… Escribe 'Ninguna' si no tienes."></textarea>
+    </div>
+
+    <div class="field">
+      <label>
+        Cirugías o hospitalizaciones recientes
+        <span class="hint">Últimos 5 años aproximadamente.</span>
+      </label>
+      <input type="text" id="cirugias" placeholder="Ej. Bypass coronario (2022), reemplazo de cadera (2023)…" />
+    </div>
+
+    <div class="nav-row">
+      <button class="btn btn-secondary" onclick="goTo(1)">← Atrás</button>
+      <button class="btn btn-primary" onclick="goTo(3)">Siguiente →</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SCREEN 3 — PASO 3: Dispositivos y Directivas
+  ══════════════════════════════════════════ -->
+  <div id="step-3" class="screen">
+    <div class="progress-wrap">
+      <div class="progress-step done"></div>
+      <div class="progress-step done"></div>
+      <div class="progress-step done"></div>
+      <div class="progress-step"></div>
+    </div>
+    <p class="progress-label">Paso 3 de 4</p>
+
+    <div class="step-head">
+      <h2>Dispositivos y directivas</h2>
+      <p>Información crítica que puede cambiar cómo te tratan los paramédicos.</p>
+    </div>
+
+    <div class="field">
+      <label>
+        Dispositivos médicos implantados
+        <span class="hint">Ej. marcapasos, desfibrilador (DAI), bomba de insulina, stent, prótesis…</span>
+      </label>
+      <input type="text" id="dispositivos" placeholder="Ej. Marcapasos (2021), stent coronario… Escribe 'Ninguno' si no aplica." />
+    </div>
+
+    <div class="field">
+      <label>
+        Ayudas y auxiliares
+        <span class="hint">Dispositivos de apoyo que usas normalmente.</span>
+      </label>
+      <input type="text" id="auxiliares" placeholder="Ej. silla de ruedas, andadera, audífonos, lentes, dentadura…" />
+    </div>
+
+    <div class="field">
+      <label>Orden de No Resucitar (DNR)</label>
+      <div class="radio-group">
+        <label><input type="radio" name="dnr" value="No" checked /> No tengo</label>
+        <label><input type="radio" name="dnr" value="Sí — documento en casa" /> Sí, documento en casa</label>
+        <label><input type="radio" name="dnr" value="Sí — documento con médico" /> Sí, con mi médico</label>
+      </div>
+    </div>
+
+    <div class="nav-row">
+      <button class="btn btn-secondary" onclick="goTo(2)">← Atrás</button>
+      <button class="btn btn-primary" onclick="goTo(4)">Siguiente →</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SCREEN 4 — PASO 4: Contactos
+  ══════════════════════════════════════════ -->
+  <div id="step-4" class="screen">
+    <div class="progress-wrap">
+      <div class="progress-step done"></div>
+      <div class="progress-step done"></div>
+      <div class="progress-step done"></div>
+      <div class="progress-step done"></div>
+    </div>
+    <p class="progress-label">Paso 4 de 4</p>
+
+    <div class="step-head">
+      <h2>Contactos de emergencia</h2>
+      <p>¿A quién llamamos si te pasa algo?</p>
+    </div>
+
+    <div class="field-pair">
+      <div class="field">
+        <label>Contacto 1 — Nombre <span class="req">*</span></label>
+        <input type="text" id="c1_nombre" placeholder="Nombre completo" />
+      </div>
+      <div class="field">
+        <label>Contacto 1 — Teléfono <span class="req">*</span></label>
+        <input type="tel" id="c1_tel" placeholder="Ej. +52 55 1234 5678" />
+      </div>
+    </div>
+
+    <div class="field-pair">
+      <div class="field">
+        <label>Contacto 2 — Nombre</label>
+        <input type="text" id="c2_nombre" placeholder="Nombre completo" />
+      </div>
+      <div class="field">
+        <label>Contacto 2 — Teléfono</label>
+        <input type="tel" id="c2_tel" placeholder="Ej. +52 55 9876 5432" />
+      </div>
+    </div>
+
+    <div class="field-pair">
+      <div class="field">
+        <label>Médico de cabecera</label>
+        <input type="text" id="medico_nombre" placeholder="Dr. / Dra." />
+      </div>
+      <div class="field">
+        <label>Teléfono del médico</label>
+        <input type="tel" id="medico_tel" placeholder="Número de consultorio" />
+      </div>
+    </div>
+
+    <div class="field">
+      <label>
+        Notas adicionales
+        <span class="hint">Cualquier otra información relevante para los paramédicos.</span>
+      </label>
+      <textarea id="notas" placeholder="Ej. paciente no habla inglés, vive solo, tiene perro en casa…"></textarea>
+    </div>
+
+    <div class="nav-row">
+      <button class="btn btn-secondary" onclick="goTo(3)">← Atrás</button>
+      <button class="btn btn-primary" onclick="generateQR()">Generar mi código QR →</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════
+       SCREEN 5 — OUTPUT
+  ══════════════════════════════════════════ -->
+  <div id="output-screen" class="screen">
+
+    <p class="output-title">✅ ¡Tu ficha médica está lista!</p>
+    <p class="output-sub">Elige cómo quieres guardarla. El código QR contiene toda tu información médica.</p>
+
+    <!-- View toggle -->
+    <div class="toggle-row">
+      <button class="btn active-view" id="btn-wallet-view" onclick="switchView('wallet')">
+        💳 Tarjeta para imprimir
+      </button>
+      <button class="btn" id="btn-ls-view" onclick="switchView('lockscreen')">
+        📱 Pantalla de bloqueo
+      </button>
+    </div>
+
+    <!-- WALLET CARD -->
+    <div id="print-zone">
+      <div id="wallet-card">
+        <div class="card-header">
+          <div class="card-cross">
+            <svg viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect x="9" y="2" width="4" height="18" rx="1" fill="white"/>
+              <rect x="2" y="9" width="18" height="4" rx="1" fill="white"/>
+            </svg>
+          </div>
+          <div>
+            <div class="card-title">FICHA MÉDICA DE EMERGENCIA</div>
+            <div class="card-subtitle">Escanea el código QR para ver toda la información</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div id="qr-container"></div>
+          <div class="card-info">
+            <div class="name" id="ci-nombre"></div>
+            <div class="row"><strong>Nacimiento:</strong> <span id="ci-dob"></span></div>
+            <div class="row"><strong>Sangre:</strong> <span id="ci-sangre"></span></div>
+            <div class="row" id="ci-contacto-row"></div>
+            <div class="allergy-row" id="ci-alergias"></div>
+          </div>
+        </div>
+        <div class="card-scan-hint">
+          EN CASO DE EMERGENCIA — ESCANEAR CÓDIGO QR
+        </div>
+      </div>
+    </div>
+
+    <!-- LOCKSCREEN CARD -->
+    <div id="lockscreen-card">
+      <div class="ls-time" id="ls-time-display">9:41</div>
+      <div class="ls-date" id="ls-date-display">Miércoles, 1 de enero</div>
+      <div class="ls-alert">
+        <div class="ls-alert-title">🚨 Emergencia médica — Escanear</div>
+        <div class="ls-cross">
+          <svg viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="9" y="2" width="4" height="18" rx="1" fill="white"/>
+            <rect x="2" y="9" width="18" height="4" rx="1" fill="white"/>
+          </svg>
+        </div>
+        <div id="ls-qr"></div>
+        <div class="ls-name" id="ls-nombre"></div>
+        <div class="ls-scan">Escanea para información médica</div>
+      </div>
+    </div>
+
+    <!-- ACTION BUTTONS -->
+    <div class="action-section">
+
+      <!-- wallet buttons -->
+      <div id="wallet-actions">
+        <h3>Tarjeta para imprimir</h3>
+        <button class="btn btn-big btn-green" onclick="printCard()">
+          🖨️ Imprimir tarjeta ahora
+        </button>
+        <button class="btn btn-big btn-secondary" onclick="downloadWallet()">
+          ⬇️ Descargar como imagen
+        </button>
+      </div>
+
+      <!-- lockscreen buttons -->
+      <div id="ls-actions" style="display:none;">
+        <h3>Pantalla de bloqueo</h3>
+        <button class="btn btn-big btn-blue" onclick="downloadLockscreen()">
+          📱 Descargar imagen para celular
+        </button>
+        <p style="font-family:sans-serif;font-size:.78rem;color:var(--ink-mid);margin-top:8px;line-height:1.5;">
+          Guarda la imagen y ponla como fondo de pantalla de bloqueo de tu celular.
+        </p>
+      </div>
+
+    </div>
+
+    <div class="restart-row">
+      <button onclick="restart()">↩ Empezar de nuevo</button>
+    </div>
+
+  </div><!-- /output-screen -->
+
+</div><!-- /app -->
+
+<script>
+  /* ── NAVIGATION ── */
+  function goTo(n) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    const target = n === 'output'
+      ? document.getElementById('output-screen')
+      : document.getElementById('step-' + n);
+    if (target) target.classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  /* ── DATA COLLECTION ── */
+  function collectData() {
+    const dnrEl = document.querySelector('input[name="dnr"]:checked');
+    return {
+      nombre:      document.getElementById('nombre').value.trim(),
+      fecha_nac:   document.getElementById('fecha_nac').value,
+      tipo_sangre: document.getElementById('tipo_sangre').value,
+      condiciones: document.getElementById('condiciones').value.trim(),
+      medicamentos:document.getElementById('medicamentos').value.trim(),
+      alergias:    document.getElementById('alergias').value.trim(),
+      cirugias:    document.getElementById('cirugias').value.trim(),
+      dispositivos:document.getElementById('dispositivos').value.trim(),
+      auxiliares:  document.getElementById('auxiliares').value.trim(),
+      dnr:         dnrEl ? dnrEl.value : 'No',
+      c1_nombre:   document.getElementById('c1_nombre').value.trim(),
+      c1_tel:      document.getElementById('c1_tel').value.trim(),
+      c2_nombre:   document.getElementById('c2_nombre').value.trim(),
+      c2_tel:      document.getElementById('c2_tel').value.trim(),
+      medico_nombre:document.getElementById('medico_nombre').value.trim(),
+      medico_tel:  document.getElementById('medico_tel').value.trim(),
+      notas:       document.getElementById('notas').value.trim(),
+    };
+  }
+
+  /* ── VALIDATE ── */
+  function validate(data) {
+    if (!data.nombre) { alert('Por favor ingresa tu nombre completo.'); goTo(1); return false; }
+    if (!data.fecha_nac) { alert('Por favor ingresa tu fecha de nacimiento.'); goTo(1); return false; }
+    if (!data.alergias) { alert('Por favor completa el campo de alergias (escribe "Ninguna" si no tienes).'); goTo(2); return false; }
+    if (!data.c1_nombre || !data.c1_tel) { alert('Por favor ingresa al menos un contacto de emergencia.'); goTo(4); return false; }
+    return true;
+  }
+
+  /* ── FORMAT DATE ── */
+  function fmtDate(iso) {
+    if (!iso) return '—';
+    const [y, m, d] = iso.split('-');
+    const months = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    return `${parseInt(d)} ${months[parseInt(m)-1]} ${y}`;
+  }
+
+  /* ── BUILD QR TEXT ── */
+  function buildQRText(d) {
+    const lines = [
+      '=== FICHA MÉDICA DE EMERGENCIA ===',
+      `NOMBRE: ${d.nombre}`,
+      `NACIMIENTO: ${fmtDate(d.fecha_nac)}`,
+      d.tipo_sangre ? `SANGRE: ${d.tipo_sangre}` : '',
+      '',
+      `ALERGIAS: ${d.alergias || 'Ninguna'}`,
+      '',
+      d.condiciones ? `CONDICIONES: ${d.condiciones}` : '',
+      d.medicamentos ? `MEDICAMENTOS: ${d.medicamentos}` : '',
+      d.cirugias ? `CIRUGÍAS: ${d.cirugias}` : '',
+      '',
+      d.dispositivos ? `DISPOSITIVOS: ${d.dispositivos}` : '',
+      d.auxiliares ? `AUXILIARES: ${d.auxiliares}` : '',
+      d.dnr !== 'No' ? `DNR: ${d.dnr}` : '',
+      '',
+      `CONTACTO 1: ${d.c1_nombre} — ${d.c1_tel}`,
+      d.c2_nombre ? `CONTACTO 2: ${d.c2_nombre} — ${d.c2_tel}` : '',
+      d.medico_nombre ? `MÉDICO: ${d.medico_nombre} — ${d.medico_tel}` : '',
+      d.notas ? `\nNOTAS: ${d.notas}` : '',
+    ];
+    return lines.filter(Boolean).join('\n');
+  }
+
+  /* ── GENERATE QR ── */
+  let _qrWallet = null;
+  let _qrLs = null;
+
+  function makeQR(containerId, text, size) {
+    const el = document.getElementById(containerId);
+    el.innerHTML = '';
+    return new QRCode(el, {
+      text: text,
+      width: size,
+      height: size,
+      correctLevel: QRCode.CorrectLevel.M,
+    });
+  }
+
+  function generateQR() {
+    const data = collectData();
+    if (!validate(data)) return;
+
+    const qrText = buildQRText(data);
+
+    // populate wallet card info panel
+    document.getElementById('ci-nombre').textContent = data.nombre;
+    document.getElementById('ci-dob').textContent = fmtDate(data.fecha_nac);
+    document.getElementById('ci-sangre').textContent = data.tipo_sangre || '—';
+    document.getElementById('ci-contacto-row').innerHTML =
+      `<strong>Contacto:</strong> ${data.c1_nombre} ${data.c1_tel}`;
+    document.getElementById('ci-alergias').textContent =
+      '⚠ ALERGIAS: ' + (data.alergias || 'Ninguna');
+
+    // populate lockscreen
+    document.getElementById('ls-nombre').textContent = data.nombre;
+    const now = new Date();
+    document.getElementById('ls-time-display').textContent =
+      now.getHours().toString().padStart(2,'0') + ':' +
+      now.getMinutes().toString().padStart(2,'0');
+    const dias = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+    const meses = ['enero','febrero','marzo','abril','mayo','junio',
+                   'julio','agosto','septiembre','octubre','noviembre','diciembre'];
+    document.getElementById('ls-date-display').textContent =
+      `${dias[now.getDay()]}, ${now.getDate()} de ${meses[now.getMonth()]}`;
+
+    // render QR codes
+    makeQR('qr-container', qrText, 96);
+    makeQR('ls-qr', qrText, 130);
+
+    goTo('output');
+    switchView('wallet');
+  }
+
+  /* ── VIEW TOGGLE ── */
+  function switchView(view) {
+    const walletCard  = document.getElementById('wallet-card');
+    const lsCard      = document.getElementById('lockscreen-card');
+    const walletAct   = document.getElementById('wallet-actions');
+    const lsAct       = document.getElementById('ls-actions');
+    const btnW        = document.getElementById('btn-wallet-view');
+    const btnL        = document.getElementById('btn-ls-view');
+
+    if (view === 'wallet') {
+      walletCard.style.display  = '';
+      lsCard.classList.remove('active');
+      walletAct.style.display   = '';
+      lsAct.style.display       = 'none';
+      btnW.classList.add('active-view');
+      btnL.classList.remove('active-view');
+    } else {
+      walletCard.style.display  = 'none';
+      lsCard.classList.add('active');
+      walletAct.style.display   = 'none';
+      lsAct.style.display       = '';
+      btnL.classList.add('active-view');
+      btnW.classList.remove('active-view');
+    }
+  }
+
+  /* ── PRINT ── */
+  function printCard() {
+    document.getElementById('wallet-card').style.display = '';
+    window.print();
+  }
+
+  /* ── DOWNLOAD WALLET ── */
+  function downloadWallet() {
+    const card = document.getElementById('wallet-card');
+    card.style.display = '';
+    html2canvas(card, { scale: 3, backgroundColor: '#ffffff', useCORS: true })
+      .then(canvas => {
+        const link = document.createElement('a');
+        link.download = 'medqr-tarjeta.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      });
+  }
+
+  /* ── DOWNLOAD LOCKSCREEN ── */
+  function downloadLockscreen() {
+    const card = document.getElementById('lockscreen-card');
+    card.classList.add('active');
+
+    // Build a phone-sized canvas (1080×1920)
+    const PHONE_W = 1080;
+    const PHONE_H = 1920;
+
+    html2canvas(card, {
+      scale: 4,
+      backgroundColor: null,
+      useCORS: true,
+    }).then(captured => {
+      const out = document.createElement('canvas');
+      out.width  = PHONE_W;
+      out.height = PHONE_H;
+      const ctx = out.getContext('2d');
+
+      // background gradient
+      const grad = ctx.createLinearGradient(0, 0, PHONE_W * 0.4, PHONE_H);
+      grad.addColorStop(0,   '#1a1a2e');
+      grad.addColorStop(0.6, '#16213e');
+      grad.addColorStop(1,   '#0f3460');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, PHONE_W, PHONE_H);
+
+      // center the captured card
+      const sx = (PHONE_W - captured.width)  / 2;
+      const sy = (PHONE_H - captured.height) / 2;
+      ctx.drawImage(captured, sx, sy);
+
+      const link = document.createElement('a');
+      link.download = 'medqr-pantalla-bloqueo.png';
+      link.href = out.toDataURL('image/png');
+      link.click();
+    });
+  }
+
+  /* ── RESTART ── */
+  function restart() {
+    if (!confirm('¿Seguro que quieres empezar de nuevo? Se borrarán todos los datos.')) return;
+    document.querySelectorAll('input[type="text"], input[type="date"], input[type="tel"], textarea')
+      .forEach(el => el.value = '');
+    document.querySelectorAll('select').forEach(el => el.selectedIndex = 0);
+    const dnrDefault = document.querySelector('input[name="dnr"][value="No"]');
+    if (dnrDefault) dnrDefault.checked = true;
+    goTo(1);
+  }
+</script>
+</body>
+</html>
