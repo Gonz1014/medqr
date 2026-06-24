@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>MedQR — Ficha Médica de Emergencia</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <style>
     /* ── TOKENS ── */
@@ -885,12 +885,38 @@
   function makeQR(containerId, text, size) {
     const el = document.getElementById(containerId);
     el.innerHTML = '';
-    return new QRCode(el, {
-      text: text,
-      width: size,
-      height: size,
-      correctLevel: QRCode.CorrectLevel.L,
-    });
+    try {
+      // qrcode-generator auto-selects version 1-40 (supports up to ~7000 chars at Level L)
+      const qr = qrcode(0, 'L');
+      qr.addData(text);
+      qr.make();
+      // Draw onto a canvas so html2canvas can capture it
+      const moduleCount = qr.getModuleCount();
+      const canvas = document.createElement('canvas');
+      canvas.width  = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      const cellSize = size / moduleCount;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, size, size);
+      ctx.fillStyle = '#000000';
+      for (let row = 0; row < moduleCount; row++) {
+        for (let col = 0; col < moduleCount; col++) {
+          if (qr.isDark(row, col)) {
+            ctx.fillRect(
+              Math.floor(col * cellSize),
+              Math.floor(row * cellSize),
+              Math.ceil(cellSize),
+              Math.ceil(cellSize)
+            );
+          }
+        }
+      }
+      el.appendChild(canvas);
+    } catch(e) {
+      console.error('QR error:', e);
+      el.innerHTML = '<p style="color:red;font-size:11px">Error QR</p>';
+    }
   }
 
   function generateQR() {
