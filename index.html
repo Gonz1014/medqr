@@ -775,12 +775,71 @@
     };
   }
 
+  /* ── SHOW ERROR ── */
+  function showError(msg, step) {
+    // Remove any existing error banner
+    const old = document.getElementById('error-banner');
+    if (old) old.remove();
+
+    goTo(step);
+
+    // Wait for screen to swap, then inject banner
+    setTimeout(() => {
+      const screen = step === 'output'
+        ? document.getElementById('output-screen')
+        : document.getElementById('step-' + step);
+
+      const banner = document.createElement('div');
+      banner.id = 'error-banner';
+      banner.style.cssText = `
+        background:#fff0f0;
+        border:2px solid var(--red);
+        border-radius:10px;
+        padding:14px 18px;
+        font-family:sans-serif;
+        font-size:.9rem;
+        color:#7a1010;
+        font-weight:600;
+        margin-bottom:20px;
+        display:flex;
+        align-items:center;
+        gap:10px;
+      `;
+      banner.innerHTML = '⚠️ ' + msg;
+
+      // Insert after the progress label
+      const label = screen.querySelector('.progress-label') || screen.querySelector('.step-head');
+      if (label) {
+        label.parentNode.insertBefore(banner, label.nextSibling);
+      } else {
+        screen.prepend(banner);
+      }
+
+      banner.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+      // Auto-dismiss after 6 seconds
+      setTimeout(() => banner.remove(), 6000);
+    }, 50);
+  }
+
   /* ── VALIDATE ── */
   function validate(data) {
-    if (!data.nombre) { alert('Por favor ingresa tu nombre completo.'); goTo(1); return false; }
-    if (!data.fecha_nac) { alert('Por favor ingresa tu fecha de nacimiento.'); goTo(1); return false; }
-    if (!data.alergias) { alert('Por favor completa el campo de alergias (escribe "Ninguna" si no tienes).'); goTo(2); return false; }
-    if (!data.c1_nombre || !data.c1_tel) { alert('Por favor ingresa al menos un contacto de emergencia.'); goTo(4); return false; }
+    if (!data.nombre) {
+      showError('Falta tu nombre completo en el Paso 1.', 1);
+      return false;
+    }
+    if (!data.fecha_nac) {
+      showError('Falta tu fecha de nacimiento en el Paso 1.', 1);
+      return false;
+    }
+    if (!data.alergias) {
+      showError('El campo de alergias es obligatorio. Escribe "Ninguna" si no tienes.', 2);
+      return false;
+    }
+    if (!data.c1_nombre || !data.c1_tel) {
+      showError('Debes ingresar al menos un contacto de emergencia (nombre y teléfono).', 4);
+      return false;
+    }
     return true;
   }
 
@@ -792,28 +851,29 @@
     return `${parseInt(d)} ${months[parseInt(m)-1]} ${y}`;
   }
 
-  /* ── BUILD QR TEXT ── */
+  /* ── BUILD QR TEXT (compact) ── */
+  function truncate(str, max) {
+    if (!str) return '';
+    return str.length > max ? str.substring(0, max) + '...' : str;
+  }
+
   function buildQRText(d) {
     const lines = [
-      '=== FICHA MÉDICA DE EMERGENCIA ===',
-      `NOMBRE: ${d.nombre}`,
-      `NACIMIENTO: ${fmtDate(d.fecha_nac)}`,
-      d.tipo_sangre ? `SANGRE: ${d.tipo_sangre}` : '',
-      '',
-      `ALERGIAS: ${d.alergias || 'Ninguna'}`,
-      '',
-      d.condiciones ? `CONDICIONES: ${d.condiciones}` : '',
-      d.medicamentos ? `MEDICAMENTOS: ${d.medicamentos}` : '',
-      d.cirugias ? `CIRUGÍAS: ${d.cirugias}` : '',
-      '',
-      d.dispositivos ? `DISPOSITIVOS: ${d.dispositivos}` : '',
-      d.auxiliares ? `AUXILIARES: ${d.auxiliares}` : '',
-      d.dnr !== 'No' ? `DNR: ${d.dnr}` : '',
-      '',
-      `CONTACTO 1: ${d.c1_nombre} — ${d.c1_tel}`,
-      d.c2_nombre ? `CONTACTO 2: ${d.c2_nombre} — ${d.c2_tel}` : '',
-      d.medico_nombre ? `MÉDICO: ${d.medico_nombre} — ${d.medico_tel}` : '',
-      d.notas ? `\nNOTAS: ${d.notas}` : '',
+      'FICHA MEDICA DE EMERGENCIA',
+      'NOM:' + d.nombre,
+      'NAC:' + fmtDate(d.fecha_nac),
+      d.tipo_sangre ? 'SANG:' + d.tipo_sangre : '',
+      'ALER:' + truncate(d.alergias || 'Ninguna', 120),
+      d.condiciones  ? 'COND:' + truncate(d.condiciones, 120)  : '',
+      d.medicamentos ? 'MED:'  + truncate(d.medicamentos, 120) : '',
+      d.cirugias     ? 'CIR:'  + truncate(d.cirugias, 80)      : '',
+      d.dispositivos ? 'DISP:' + truncate(d.dispositivos, 80)  : '',
+      d.auxiliares   ? 'AUX:'  + truncate(d.auxiliares, 60)    : '',
+      d.dnr !== 'No' ? 'DNR:'  + d.dnr                        : '',
+      'C1:' + d.c1_nombre + '|' + d.c1_tel,
+      d.c2_nombre     ? 'C2:' + d.c2_nombre + '|' + d.c2_tel       : '',
+      d.medico_nombre ? 'DR:' + d.medico_nombre + '|' + d.medico_tel : '',
+      d.notas         ? 'NOTAS:' + truncate(d.notas, 100)           : '',
     ];
     return lines.filter(Boolean).join('\n');
   }
@@ -829,7 +889,7 @@
       text: text,
       width: size,
       height: size,
-      correctLevel: QRCode.CorrectLevel.M,
+      correctLevel: QRCode.CorrectLevel.L,
     });
   }
 
