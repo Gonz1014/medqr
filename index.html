@@ -404,6 +404,55 @@
         width: 100%;
       }
     }
+
+    /* ── PREVIEW CARD ── */
+    .preview-card {
+      background: var(--white);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+    .preview-section {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--rule);
+    }
+    .preview-section:last-child { border-bottom: none; }
+    .preview-allergy {
+      background: #fff5f5;
+      border-left: 4px solid var(--red);
+    }
+    .preview-section-title {
+      font-family: sans-serif;
+      font-size: .72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      color: var(--ink-light);
+      margin-bottom: 10px;
+    }
+    .preview-row {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 6px;
+      font-family: sans-serif;
+      font-size: .88rem;
+      line-height: 1.4;
+    }
+    .preview-label {
+      flex-shrink: 0;
+      width: 110px;
+      color: var(--ink-light);
+      font-size: .8rem;
+    }
+    .preview-val { color: var(--ink); font-weight: 500; flex: 1; }
+    .preview-val-full {
+      color: var(--red);
+      font-family: sans-serif;
+      font-size: .9rem;
+      font-weight: 600;
+      line-height: 1.5;
+    }
   </style>
 </head>
 <body>
@@ -634,12 +683,72 @@
 
     <div class="nav-row">
       <button class="btn btn-secondary" onclick="goTo(3)">← Atrás</button>
-      <button class="btn btn-primary" onclick="generateQR()">Generar mi código QR →</button>
+      <button class="btn btn-primary" onclick="showPreview()">Revisar información →</button>
     </div>
   </div>
 
+
   <!-- ══════════════════════════════════════════
-       SCREEN 5 — OUTPUT
+       SCREEN 5 — VISTA PREVIA
+  ══════════════════════════════════════════ -->
+  <div id="preview-screen" class="screen">
+
+    <div class="step-head" style="margin-top:20px;">
+      <h2>Revisa tu información</h2>
+      <p>Confirma que todo esté correcto antes de generar tu código QR.</p>
+    </div>
+
+    <div class="preview-card">
+
+      <div class="preview-section">
+        <div class="preview-section-title">👤 Identificación</div>
+        <div class="preview-row"><span class="preview-label">Nombre</span><span class="preview-val" id="pv-nombre"></span></div>
+        <div class="preview-row"><span class="preview-label">Nacimiento</span><span class="preview-val" id="pv-dob"></span></div>
+        <div class="preview-row"><span class="preview-label">Tipo de sangre</span><span class="preview-val" id="pv-sangre"></span></div>
+      </div>
+
+      <div class="preview-section preview-allergy">
+        <div class="preview-section-title">⚠️ Alergias</div>
+        <div class="preview-val-full" id="pv-alergias"></div>
+      </div>
+
+      <div class="preview-section" id="pv-medico-section">
+        <div class="preview-section-title">🏥 Historial médico</div>
+        <div class="preview-row" id="pv-cond-row"><span class="preview-label">Condiciones</span><span class="preview-val" id="pv-condiciones"></span></div>
+        <div class="preview-row" id="pv-med-row"><span class="preview-label">Medicamentos</span><span class="preview-val" id="pv-medicamentos"></span></div>
+        <div class="preview-row" id="pv-cir-row"><span class="preview-label">Cirugías</span><span class="preview-val" id="pv-cirugias"></span></div>
+      </div>
+
+      <div class="preview-section" id="pv-disp-section">
+        <div class="preview-section-title">🔧 Dispositivos y directivas</div>
+        <div class="preview-row" id="pv-disp-row"><span class="preview-label">Dispositivos</span><span class="preview-val" id="pv-dispositivos"></span></div>
+        <div class="preview-row" id="pv-aux-row"><span class="preview-label">Auxiliares</span><span class="preview-val" id="pv-auxiliares"></span></div>
+        <div class="preview-row" id="pv-dnr-row"><span class="preview-label">DNR</span><span class="preview-val" id="pv-dnr"></span></div>
+      </div>
+
+      <div class="preview-section">
+        <div class="preview-section-title">📞 Contactos</div>
+        <div class="preview-row"><span class="preview-label">Contacto 1</span><span class="preview-val" id="pv-c1"></span></div>
+        <div class="preview-row" id="pv-c2-row"><span class="preview-label">Contacto 2</span><span class="preview-val" id="pv-c2"></span></div>
+        <div class="preview-row" id="pv-dr-row"><span class="preview-label">Médico</span><span class="preview-val" id="pv-medico"></span></div>
+        <div class="preview-row" id="pv-notas-row"><span class="preview-label">Notas</span><span class="preview-val" id="pv-notas"></span></div>
+      </div>
+
+    </div>
+
+    <p style="font-family:sans-serif;font-size:.8rem;color:var(--ink-light);margin:16px 0 4px;">
+      ¿Algo está mal? Regresa y corrígelo.
+    </p>
+
+    <div class="nav-row">
+      <button class="btn btn-secondary" onclick="goTo(4)">← Corregir</button>
+      <button class="btn btn-primary" onclick="generateQR()" style="background:#2d8a2d;">✅ Generar código QR</button>
+    </div>
+
+  </div><!-- /preview-screen -->
+
+  <!-- ══════════════════════════════════════════
+       SCREEN 6 — OUTPUT
   ══════════════════════════════════════════ -->
   <div id="output-screen" class="screen">
 
@@ -744,9 +853,10 @@
   /* ── NAVIGATION ── */
   function goTo(n) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    const target = n === 'output'
-      ? document.getElementById('output-screen')
-      : document.getElementById('step-' + n);
+    let target;
+    if (n === 'output')   target = document.getElementById('output-screen');
+    else if (n === 'preview') target = document.getElementById('preview-screen');
+    else                  target = document.getElementById('step-' + n);
     if (target) target.classList.add('active');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
@@ -919,11 +1029,77 @@
     }
   }
 
+
+  /* ── SHOW PREVIEW ── */
+  function showPreview() {
+    const data = collectData();
+    if (!validate(data)) return;
+
+    // helper: show/hide a row
+    function setRow(id, val) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const row = el.closest('.preview-row') || document.getElementById(id + '-row');
+      if (val) {
+        el.textContent = val;
+        if (row) row.style.display = '';
+      } else {
+        if (row) row.style.display = 'none';
+      }
+    }
+
+    document.getElementById('pv-nombre').textContent = data.nombre;
+    document.getElementById('pv-dob').textContent    = fmtDate(data.fecha_nac);
+    document.getElementById('pv-sangre').textContent = data.tipo_sangre || '— No especificado';
+    document.getElementById('pv-alergias').textContent = data.alergias || 'Ninguna';
+
+    setRow('pv-condiciones',  data.condiciones  || null);
+    setRow('pv-medicamentos', data.medicamentos || null);
+    setRow('pv-cirugias',     data.cirugias     || null);
+
+    setRow('pv-dispositivos', data.dispositivos || null);
+    setRow('pv-auxiliares',   data.auxiliares   || null);
+
+    const dnrEl = document.getElementById('pv-dnr');
+    const dnrRow = document.getElementById('pv-dnr-row');
+    if (data.dnr !== 'No') {
+      dnrEl.textContent = data.dnr;
+      dnrRow.style.display = '';
+    } else {
+      dnrRow.style.display = 'none';
+    }
+
+    document.getElementById('pv-c1').textContent = data.c1_nombre + ' — ' + data.c1_tel;
+
+    const c2Row = document.getElementById('pv-c2-row');
+    if (data.c2_nombre) {
+      document.getElementById('pv-c2').textContent = data.c2_nombre + ' — ' + data.c2_tel;
+      c2Row.style.display = '';
+    } else { c2Row.style.display = 'none'; }
+
+    const drRow = document.getElementById('pv-dr-row');
+    if (data.medico_nombre) {
+      document.getElementById('pv-medico').textContent = data.medico_nombre + ' — ' + data.medico_tel;
+      drRow.style.display = '';
+    } else { drRow.style.display = 'none'; }
+
+    const notasRow = document.getElementById('pv-notas-row');
+    if (data.notas) {
+      document.getElementById('pv-notas').textContent = data.notas;
+      notasRow.style.display = '';
+    } else { notasRow.style.display = 'none'; }
+
+    goTo('preview');
+  }
+
+  let _lastQRText = '';
+
   function generateQR() {
     const data = collectData();
     if (!validate(data)) return;
 
     const qrText = buildQRText(data);
+    _lastQRText = qrText;
 
     // populate wallet card info panel
     document.getElementById('ci-nombre').textContent = data.nombre;
@@ -1000,42 +1176,142 @@
   }
 
   /* ── DOWNLOAD LOCKSCREEN ── */
+  // Draws the QR card directly onto a phone-resolution canvas.
+  // No time/date — those come from the phone UI on top of the wallpaper.
+  // Card is placed in the lower 55% so the phone's clock sits above it naturally.
   function downloadLockscreen() {
-    const card = document.getElementById('lockscreen-card');
-    card.classList.add('active');
+    const W = 1170;   // iPhone 14 logical width @3x
+    const H = 2532;
 
-    // Build a phone-sized canvas (1080×1920)
-    const PHONE_W = 1080;
-    const PHONE_H = 1920;
+    const out = document.createElement('canvas');
+    out.width  = W;
+    out.height = H;
+    const ctx = out.getContext('2d');
 
-    html2canvas(card, {
-      scale: 4,
-      backgroundColor: null,
-      useCORS: true,
-    }).then(captured => {
-      const out = document.createElement('canvas');
-      out.width  = PHONE_W;
-      out.height = PHONE_H;
-      const ctx = out.getContext('2d');
+    // ── Background gradient ──
+    const grad = ctx.createLinearGradient(0, 0, W * 0.5, H);
+    grad.addColorStop(0,   '#1a1a2e');
+    grad.addColorStop(0.6, '#16213e');
+    grad.addColorStop(1,   '#0f3460');
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, W, H);
 
-      // background gradient
-      const grad = ctx.createLinearGradient(0, 0, PHONE_W * 0.4, PHONE_H);
-      grad.addColorStop(0,   '#1a1a2e');
-      grad.addColorStop(0.6, '#16213e');
-      grad.addColorStop(1,   '#0f3460');
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, PHONE_W, PHONE_H);
+    // ── Card dimensions & position ──
+    const CARD_W   = 800;
+    const PADDING  = 48;
+    const RADIUS   = 60;
+    // Place card so its top starts at ~58% of screen height
+    const CARD_TOP = Math.round(H * 0.55);
 
-      // center the captured card
-      const sx = (PHONE_W - captured.width)  / 2;
-      const sy = (PHONE_H - captured.height) / 2;
-      ctx.drawImage(captured, sx, sy);
+    // ── Re-render QR at high resolution onto a temp canvas ──
+    const qrText = _lastQRText;
+    if (!qrText) { alert('Genera el QR primero.'); return; }
 
-      const link = document.createElement('a');
-      link.download = 'medqr-pantalla-bloqueo.png';
-      link.href = out.toDataURL('image/png');
-      link.click();
-    });
+    const qr = qrcode(0, 'L');
+    qr.addData(qrText);
+    qr.make();
+    const moduleCount = qr.getModuleCount();
+    const QR_SIZE = 560;
+    const qrCanvas = document.createElement('canvas');
+    qrCanvas.width  = QR_SIZE;
+    qrCanvas.height = QR_SIZE;
+    const qc = qrCanvas.getContext('2d');
+    const cell = QR_SIZE / moduleCount;
+    qc.fillStyle = '#ffffff';
+    qc.fillRect(0, 0, QR_SIZE, QR_SIZE);
+    qc.fillStyle = '#000000';
+    for (let r = 0; r < moduleCount; r++) {
+      for (let c = 0; c < moduleCount; c++) {
+        if (qr.isDark(r, c)) {
+          qc.fillRect(Math.floor(c*cell), Math.floor(r*cell), Math.ceil(cell), Math.ceil(cell));
+        }
+      }
+    }
+
+    // ── Card content height calculation ──
+    const TITLE_H   = 80;   // "EMERGENCIA MÉDICA" text block
+    const CROSS_R   = 44;   // red circle radius
+    const CROSS_GAP = 30;
+    const QR_GAP    = 30;
+    const NAME_H    = 60;
+    const HINT_H    = 44;
+    const CARD_H    = PADDING*2 + TITLE_H + CROSS_GAP + CROSS_R*2 + QR_GAP + QR_SIZE + NAME_H + HINT_H + 20;
+
+    const CARD_X = (W - CARD_W) / 2;
+
+    // ── Draw frosted card background ──
+    ctx.save();
+    roundRect(ctx, CARD_X, CARD_TOP, CARD_W, CARD_H, RADIUS);
+    ctx.fillStyle = 'rgba(255,255,255,0.13)';
+    ctx.fill();
+    ctx.restore();
+
+    let y = CARD_TOP + PADDING;
+
+    // ── Title ──
+    ctx.fillStyle = 'rgba(255,255,255,0.80)';
+    ctx.font = 'bold 46px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.letterSpacing = '4px';
+    ctx.fillText('🚨  EMERGENCIA MÉDICA — ESCANEAR', W/2, y + 50);
+    y += TITLE_H + CROSS_GAP;
+
+    // ── Red cross circle ──
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(W/2, y + CROSS_R, CROSS_R, 0, Math.PI*2);
+    ctx.fillStyle = '#C0392B';
+    ctx.fill();
+    ctx.restore();
+    // Plus sign
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(W/2 - 6,  y + CROSS_R - 26, 12, 52);
+    ctx.fillRect(W/2 - 26, y + CROSS_R - 6,  52, 12);
+    y += CROSS_R*2 + QR_GAP;
+
+    // ── QR code ──
+    const qrX = (W - QR_SIZE) / 2;
+    // White padding around QR
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    roundRect(ctx, qrX - 16, y - 16, QR_SIZE + 32, QR_SIZE + 32, 20);
+    ctx.fill();
+    ctx.drawImage(qrCanvas, qrX, y, QR_SIZE, QR_SIZE);
+    y += QR_SIZE + 32;
+
+    // ── Name ──
+    const nombre = document.getElementById('ci-nombre').textContent || '';
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 52px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(nombre, W/2, y + 48);
+    y += NAME_H;
+
+    // ── Hint ──
+    ctx.fillStyle = 'rgba(255,255,255,0.55)';
+    ctx.font = '36px sans-serif';
+    ctx.fillText('Escanea para información médica', W/2, y + 36);
+
+    // ── Download ──
+    const link = document.createElement('a');
+    link.download = 'medqr-pantalla-bloqueo.png';
+    link.href = out.toDataURL('image/png');
+    link.click();
+  }
+
+  // Helper: rounded rect path
+  function roundRect(ctx, x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h);
+    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r);
+    ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath();
   }
 
   /* ── RESTART ── */
