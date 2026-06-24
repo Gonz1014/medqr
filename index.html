@@ -851,31 +851,31 @@
     return `${parseInt(d)} ${months[parseInt(m)-1]} ${y}`;
   }
 
-  /* ── BUILD QR TEXT (compact) ── */
-  function truncate(str, max) {
+  /* ── BUILD QR TEXT (ultra-compact, max ~800 chars) ── */
+  function tr(str, max) {
     if (!str) return '';
-    return str.length > max ? str.substring(0, max) + '...' : str;
+    str = str.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+    return str.length > max ? str.substring(0, max) + '..' : str;
   }
 
   function buildQRText(d) {
-    const lines = [
-      'FICHA MEDICA DE EMERGENCIA',
-      'NOM:' + d.nombre,
-      'NAC:' + fmtDate(d.fecha_nac),
-      d.tipo_sangre ? 'SANG:' + d.tipo_sangre : '',
-      'ALER:' + truncate(d.alergias || 'Ninguna', 120),
-      d.condiciones  ? 'COND:' + truncate(d.condiciones, 120)  : '',
-      d.medicamentos ? 'MED:'  + truncate(d.medicamentos, 120) : '',
-      d.cirugias     ? 'CIR:'  + truncate(d.cirugias, 80)      : '',
-      d.dispositivos ? 'DISP:' + truncate(d.dispositivos, 80)  : '',
-      d.auxiliares   ? 'AUX:'  + truncate(d.auxiliares, 60)    : '',
-      d.dnr !== 'No' ? 'DNR:'  + d.dnr                        : '',
-      'C1:' + d.c1_nombre + '|' + d.c1_tel,
-      d.c2_nombre     ? 'C2:' + d.c2_nombre + '|' + d.c2_tel       : '',
-      d.medico_nombre ? 'DR:' + d.medico_nombre + '|' + d.medico_tel : '',
-      d.notas         ? 'NOTAS:' + truncate(d.notas, 100)           : '',
+    // Single-letter keys to minimize character count
+    const parts = [
+      'EMERGENCIA MEDICA',
+      'N:'  + tr(d.nombre, 40),
+      'F:'  + fmtDate(d.fecha_nac),
+      d.tipo_sangre        ? 'S:'  + d.tipo_sangre                   : '',
+      'A:'  + tr(d.alergias || 'Ninguna', 80),
+      d.condiciones        ? 'C:'  + tr(d.condiciones, 80)           : '',
+      d.medicamentos       ? 'M:'  + tr(d.medicamentos, 80)          : '',
+      d.dispositivos       ? 'D:'  + tr(d.dispositivos, 60)          : '',
+      d.dnr !== 'No'       ? 'DNR' : '',
+      'T1:' + tr(d.c1_nombre, 30) + ' ' + tr(d.c1_tel, 20),
+      d.c2_nombre          ? 'T2:' + tr(d.c2_nombre, 30) + ' ' + tr(d.c2_tel, 20) : '',
+      d.medico_nombre      ? 'DR:' + tr(d.medico_nombre, 30) + ' ' + tr(d.medico_tel, 20) : '',
+      d.notas              ? 'OBS:' + tr(d.notas, 60)                : '',
     ];
-    return lines.filter(Boolean).join('\n');
+    return parts.filter(Boolean).join('|');
   }
 
   /* ── GENERATE QR ── */
