@@ -1,0 +1,1484 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MedQR — Ficha Médica de Emergencia</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    :root {
+      --red:       #C0392B;
+      --red-dark:  #962d22;
+      --red-light: #fdf2f1;
+      --ink:       #1a1a1a;
+      --ink-mid:   #4a4a4a;
+      --ink-light: #888;
+      --rule:      #e0e0e0;
+      --bg:        #f7f6f3;
+      --white:     #ffffff;
+      --radius:    10px;
+      --shadow:    0 2px 14px rgba(0,0,0,.08);
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Georgia','Times New Roman',serif; background: var(--bg); color: var(--ink); min-height: 100vh; }
+
+    /* HEADER */
+    header { background: var(--red); color: var(--white); padding: 18px 24px; display: flex; align-items: center; gap: 14px; }
+    .header-cross { width: 36px; height: 36px; background: var(--white); border-radius: 4px; display: grid; place-items: center; flex-shrink: 0; }
+    .header-cross svg { width: 22px; height: 22px; }
+    header h1 { font-size: 1.2rem; font-weight: bold; line-height: 1.2; }
+    header p { font-size: .78rem; opacity: .85; font-family: sans-serif; margin-top: 2px; }
+
+    /* PRIVACY */
+    .privacy-banner { background: #eaf4ea; border-left: 4px solid #4caf50; margin: 20px auto; max-width: 680px; padding: 12px 16px; border-radius: 0 var(--radius) var(--radius) 0; font-family: sans-serif; font-size: .82rem; color: #2e5e2e; line-height: 1.5; }
+
+    /* WRAPPER */
+    .app { max-width: 680px; margin: 0 auto; padding: 0 16px 60px; }
+    .screen { display: none; }
+    .screen.active { display: block; }
+
+    /* PROGRESS */
+    .progress-wrap { margin: 24px 0 6px; display: flex; gap: 5px; }
+    .progress-step { flex: 1; height: 5px; border-radius: 3px; background: var(--rule); transition: background .3s; }
+    .progress-step.done { background: var(--red); }
+    .progress-label { font-family: sans-serif; font-size: .76rem; color: var(--ink-light); margin-bottom: 16px; }
+
+    /* STEP HEAD */
+    .step-head { border-left: 4px solid var(--red); padding-left: 12px; margin-bottom: 22px; }
+    .step-head h2 { font-size: 1.1rem; font-weight: bold; }
+    .step-head p { font-family: sans-serif; font-size: .8rem; color: var(--ink-mid); margin-top: 3px; }
+
+    /* FIELDS */
+    .field { margin-bottom: 18px; }
+    label { display: block; font-family: sans-serif; font-size: .83rem; font-weight: 600; color: var(--ink); margin-bottom: 5px; }
+    label .req { color: var(--red); margin-left: 2px; }
+    label .hint { font-weight: 400; color: var(--ink-light); font-size: .76rem; display: block; margin-top: 1px; }
+    input[type="text"], input[type="date"], input[type="tel"], input[type="email"], input[type="number"], select, textarea {
+      width: 100%; padding: 10px 12px; border: 1.5px solid var(--rule); border-radius: var(--radius);
+      font-size: .93rem; font-family: sans-serif; color: var(--ink); background: var(--white);
+      transition: border-color .2s; appearance: none; -webkit-appearance: none;
+    }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: var(--red); box-shadow: 0 0 0 3px rgba(192,57,43,.1); }
+    textarea { resize: vertical; min-height: 76px; }
+    .field-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .field-trio { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+    @media(max-width:480px){ .field-pair,.field-trio { grid-template-columns: 1fr; } }
+
+    /* RADIO */
+    .radio-group { display: flex; gap: 10px; flex-wrap: wrap; }
+    .radio-group label { font-weight: 400; display: flex; align-items: center; gap: 6px; cursor: pointer; background: var(--white); border: 1.5px solid var(--rule); border-radius: 8px; padding: 7px 13px; font-size: .86rem; transition: border-color .2s, background .2s; }
+    .radio-group input[type="radio"] { accent-color: var(--red); width: 15px; height: 15px; }
+    .radio-group label:has(input:checked) { border-color: var(--red); background: var(--red-light); }
+
+    /* REPEATER */
+    .repeater-item { background: var(--white); border: 1.5px solid var(--rule); border-radius: var(--radius); padding: 14px; margin-bottom: 10px; position: relative; }
+    .repeater-item .remove-btn { position: absolute; top: 10px; right: 10px; background: none; border: none; color: var(--ink-light); font-size: 1.1rem; cursor: pointer; line-height: 1; }
+    .repeater-item .remove-btn:hover { color: var(--red); }
+    .add-btn { display: flex; align-items: center; gap: 6px; background: none; border: 1.5px dashed var(--rule); border-radius: var(--radius); padding: 10px 16px; font-family: sans-serif; font-size: .84rem; color: var(--ink-mid); cursor: pointer; width: 100%; justify-content: center; transition: border-color .2s, color .2s; }
+    .add-btn:hover { border-color: var(--red); color: var(--red); }
+
+    /* SECTION DIVIDER */
+    .section-divider { font-family: sans-serif; font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-light); border-bottom: 1px solid var(--rule); padding-bottom: 6px; margin: 24px 0 16px; }
+
+    /* BUTTONS */
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 13px 26px; border: none; border-radius: var(--radius); font-family: sans-serif; font-size: .97rem; font-weight: 600; cursor: pointer; transition: background .2s, transform .1s; }
+    .btn:active { transform: scale(.98); }
+    .btn-primary { background: var(--red); color: var(--white); }
+    .btn-primary:hover { background: var(--red-dark); }
+    .btn-secondary { background: var(--white); color: var(--ink); border: 1.5px solid var(--rule); }
+    .btn-secondary:hover { border-color: #aaa; }
+    .btn-big { width: 100%; padding: 17px; font-size: 1rem; border-radius: 12px; margin-bottom: 12px; }
+    .btn-green { background: #2d8a2d; color: var(--white); }
+    .btn-green:hover { background: #246824; }
+    .btn-blue { background: #1a5fa8; color: var(--white); }
+    .btn-blue:hover { background: #154d8a; }
+    .nav-row { display: flex; justify-content: space-between; gap: 12px; margin-top: 26px; }
+    .nav-row .btn { flex: 1; }
+
+    /* EMERGENCY BANNER on step 1 */
+    .emergency-banner { background: var(--red); color: var(--white); border-radius: var(--radius); padding: 14px 18px; margin-bottom: 22px; font-family: sans-serif; font-size: .9rem; line-height: 1.5; }
+    .emergency-banner strong { font-size: 1rem; display: block; margin-bottom: 3px; }
+
+    /* OUTPUT */
+    #wallet-card { background: var(--white); border: 2px solid var(--ink); border-radius: 12px; padding: 16px; max-width: 560px; margin: 0 auto 26px; box-shadow: var(--shadow); }
+    .card-header { display: flex; align-items: center; gap: 10px; border-bottom: 1.5px solid var(--rule); padding-bottom: 10px; margin-bottom: 12px; }
+    .card-cross { width: 26px; height: 26px; background: var(--red); border-radius: 4px; display: grid; place-items: center; flex-shrink: 0; }
+    .card-cross svg { width: 16px; height: 16px; }
+    .card-title { font-size: .82rem; font-weight: bold; line-height: 1.2; }
+    .card-subtitle { font-size: .68rem; color: var(--ink-mid); font-family: sans-serif; }
+    .card-body { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+    #qr-container { width: 100%; display: flex; justify-content: center; }
+    #qr-container canvas { display: block; border-radius: 4px; }
+    .card-info { width: 100%; text-align: center; font-family: sans-serif; font-size: .9rem; line-height: 1.8; }
+    .card-info .name { font-size: 1.15rem; font-weight: bold; margin-bottom: 6px; font-family: Georgia,serif; }
+    .card-info .row { color: var(--ink-mid); }
+    .card-info .row strong { color: var(--ink); }
+    .card-info .allergy-row { margin-top: 8px; background: #fff3f3; border: 1px solid #f8c8c8; border-radius: 5px; padding: 6px 12px; color: var(--red); font-weight: 600; font-size: 1rem; }
+    .card-scan-hint { text-align: center; font-family: sans-serif; font-size: .64rem; color: var(--ink-light); margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--rule); }
+
+    /* LOCKSCREEN PREVIEW */
+    #lockscreen-card { background: linear-gradient(160deg,#1a1a2e 0%,#16213e 60%,#0f3460 100%); border-radius: 32px; padding: 36px 24px 32px; max-width: 210px; margin: 0 auto 26px; text-align: center; color: var(--white); box-shadow: 0 8px 32px rgba(0,0,0,.35); display: none; }
+    #lockscreen-card.active { display: block; }
+    .ls-time { font-size: 2.4rem; font-weight: 300; margin-bottom: 2px; }
+    .ls-date { font-size: .72rem; opacity: .7; font-family: sans-serif; margin-bottom: 16px; }
+    .ls-alert { background: rgba(255,255,255,.12); border-radius: 14px; padding: 12px 10px; }
+    .ls-alert-title { font-size: .62rem; font-weight: 700; letter-spacing: .1em; opacity: .8; font-family: sans-serif; text-transform: uppercase; margin-bottom: 6px; }
+    .ls-cross { width: 32px; height: 32px; background: var(--red); border-radius: 50%; display: grid; place-items: center; margin: 0 auto 7px; }
+    .ls-cross svg { width: 18px; height: 18px; }
+    #ls-qr { display: flex; justify-content: center; margin: 8px 0 7px; }
+    #ls-qr canvas { border-radius: 6px; }
+    .ls-name { font-size: .76rem; font-weight: 700; margin-bottom: 2px; }
+    .ls-scan { font-size: .6rem; opacity: .6; font-family: sans-serif; }
+
+    /* TOGGLE */
+    .toggle-row { display: flex; gap: 10px; margin-bottom: 16px; }
+    .toggle-row .btn { flex: 1; padding: 10px; font-size: .86rem; }
+    .toggle-row .btn.active-view { background: var(--red); color: var(--white); border-color: var(--red); }
+    .toggle-row .btn:not(.active-view) { background: var(--white); color: var(--ink); border: 1.5px solid var(--rule); }
+
+    /* PREVIEW CARD */
+    .preview-card { background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; margin-bottom: 16px; }
+    .preview-section { padding: 12px 16px; border-bottom: 1px solid var(--rule); }
+    .preview-section:last-child { border-bottom: none; }
+    .preview-allergy { background: #fff5f5; border-left: 4px solid var(--red); }
+    .preview-emergency { background: #fff8e1; border-left: 4px solid #f59f00; }
+    .preview-section-title { font-family: sans-serif; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-light); margin-bottom: 8px; }
+    .preview-row { display: flex; gap: 10px; margin-bottom: 5px; font-family: sans-serif; font-size: .85rem; line-height: 1.4; }
+    .preview-label { flex-shrink: 0; width: 130px; color: var(--ink-light); font-size: .78rem; }
+    .preview-val { color: var(--ink); font-weight: 500; flex: 1; }
+    .preview-val-full { color: var(--red); font-family: sans-serif; font-size: .88rem; font-weight: 600; line-height: 1.5; }
+    .preview-list { font-family: sans-serif; font-size: .83rem; color: var(--ink); line-height: 1.8; }
+    .preview-list li { margin-left: 14px; }
+
+    /* ACTION */
+    .action-section { margin-top: 6px; }
+    .action-section h3 { font-family: sans-serif; font-size: .8rem; font-weight: 600; color: var(--ink-mid); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 12px; }
+    .restart-row { text-align: center; margin-top: 22px; }
+    .restart-row button { background: none; border: none; font-family: sans-serif; font-size: .8rem; color: var(--ink-light); cursor: pointer; text-decoration: underline; }
+
+    /* ERROR */
+    #error-banner { background:#fff0f0; border:2px solid var(--red); border-radius:10px; padding:12px 16px; font-family:sans-serif; font-size:.88rem; color:#7a1010; font-weight:600; margin-bottom:18px; }
+
+    /* PRINT */
+    @media print {
+      body * { visibility: hidden; }
+      #print-zone, #print-zone * { visibility: visible; }
+      #print-zone { position: fixed; top: 0; left: 0; width: 100vw; display: flex; align-items: center; justify-content: center; padding: 20px; }
+      #wallet-card { border: 2px solid #000; box-shadow: none; max-width: 360px; width: 100%; }
+    }
+
+    /* ── VIEWER (ficha para paramédico) ── */
+    #viewer-screen { display: none; }
+    #viewer-screen.active { display: block; }
+    .viewer-header { background: var(--red); color: #fff; padding: 20px 20px 16px; margin-bottom: 0; }
+    .viewer-header h1 { font-size: 1.1rem; font-weight: bold; font-family: sans-serif; }
+    .viewer-header p  { font-size: .78rem; opacity: .85; font-family: sans-serif; margin-top: 3px; }
+    .viewer-body { max-width: 680px; margin: 0 auto; padding: 0 0 60px; }
+    .v-section { border-bottom: 1px solid var(--rule); }
+    .v-section:last-child { border-bottom: none; }
+    .v-section-inner { padding: 14px 20px; }
+    .v-section-title { font-family: sans-serif; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-light); margin-bottom: 10px; }
+    .v-emergency { background: #fff8e1; border-left: 5px solid #f59f00; }
+    .v-allergy   { background: #fff0f0; border-left: 5px solid var(--red); }
+    .v-emergency .v-section-title { color: #b07d00; }
+    .v-allergy   .v-section-title { color: var(--red); }
+    .v-contact-row { margin-bottom: 8px; font-family: sans-serif; font-size: .9rem; }
+    .v-contact-name { font-weight: 700; color: var(--ink); }
+    .v-contact-rel  { color: var(--ink-light); font-size: .8rem; }
+    .v-contact-tel  { color: #1a5fa8; font-weight: 600; font-size: .95rem; }
+    .v-allergy-text { font-family: sans-serif; font-size: .95rem; font-weight: 700; color: var(--red); line-height: 1.6; }
+    .v-row { display: flex; gap: 12px; margin-bottom: 6px; font-family: sans-serif; font-size: .88rem; line-height: 1.4; }
+    .v-label { flex-shrink: 0; width: 120px; color: var(--ink-light); font-size: .8rem; }
+    .v-val   { color: var(--ink); font-weight: 500; flex: 1; }
+    .v-list  { font-family: sans-serif; font-size: .88rem; line-height: 1.9; padding-left: 4px; }
+    .v-list-item { display: flex; gap: 8px; margin-bottom: 2px; }
+    .v-list-item::before { content: '•'; color: var(--red); font-weight: bold; flex-shrink: 0; }
+    .v-list-sub { color: var(--ink-mid); font-size: .82rem; }
+    .v-fecha { font-family: sans-serif; font-size: .72rem; color: var(--ink-light); padding: 10px 20px; background: var(--bg); text-align: right; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-cross">
+    <svg viewBox="0 0 22 22" fill="none"><rect x="9" y="2" width="4" height="18" rx="1" fill="#C0392B"/><rect x="2" y="9" width="18" height="4" rx="1" fill="#C0392B"/></svg>
+  </div>
+  <div>
+    <h1>MedQR — Ficha Médica de Emergencia</h1>
+    <p>Genera tu código QR con información médica para primeros auxilios</p>
+  </div>
+</header>
+
+<div class="app">
+
+
+  <!-- ══ VIEWER — ficha para paramédico ══ -->
+  <div id="viewer-screen">
+    <div class="viewer-header">
+      <h1>🚨 FICHA MÉDICA DE EMERGENCIA</h1>
+      <p id="v-elaboracion"></p>
+    </div>
+    <div class="viewer-body" id="viewer-body"></div>
+  </div>
+
+  <div class="privacy-banner">
+    🔒 <strong>Tu privacidad está protegida.</strong> Tu información <em>nunca sale de tu dispositivo</em>. El código QR se genera completamente en tu navegador, sin servidores ni cuentas.
+  </div>
+
+  <!-- ══ PASO 1: CONTACTO DE EMERGENCIA ══ -->
+  <div id="step-1" class="screen active">
+    <div class="progress-wrap">
+      <div class="progress-step done"></div>
+      <div class="progress-step"></div>
+      <div class="progress-step"></div>
+      <div class="progress-step"></div>
+      <div class="progress-step"></div>
+    </div>
+    <p class="progress-label">Paso 1 de 5</p>
+
+    <div class="emergency-banner">
+      <strong>🚨 Lo primero: ¿A quién llamamos en caso de emergencia?</strong>
+      Esta información aparecerá al frente de tu ficha para que los paramédicos la vean de inmediato.
+    </div>
+
+    <div class="step-head">
+      <h2>Contacto de emergencia</h2>
+      <p>Mínimo un contacto. Puede ser familiar, amigo de confianza o cuidador.</p>
+    </div>
+
+    <div id="contacts-repeater">
+      <div class="repeater-item" data-index="0">
+        <div class="field-pair">
+          <div class="field"><label>Nombre <span class="req">*</span></label><input type="text" class="c-nombre" placeholder="Nombre completo" /></div>
+          <div class="field"><label>Teléfono <span class="req">*</span></label><input type="tel" class="c-tel" placeholder="+52 55 1234 5678" /></div>
+        </div>
+        <div class="field"><label>Parentesco / relación</label><input type="text" class="c-rel" placeholder="Ej. hija, médico de cabecera, vecino…" /></div>
+      </div>
+    </div>
+    <button class="add-btn" onclick="addContact()">+ Agregar otro contacto</button>
+
+    <div class="nav-row" style="justify-content:flex-end;">
+      <button class="btn btn-primary" style="flex:0 0 auto;min-width:160px;" onclick="goTo(2)">Siguiente →</button>
+    </div>
+  </div>
+
+  <!-- ══ PASO 2: DATOS PERSONALES ══ -->
+  <div id="step-2" class="screen">
+    <div class="progress-wrap">
+      <div class="progress-step done"></div>
+      <div class="progress-step done"></div>
+      <div class="progress-step"></div>
+      <div class="progress-step"></div>
+      <div class="progress-step"></div>
+    </div>
+    <p class="progress-label">Paso 2 de 5</p>
+
+    <div class="step-head">
+      <h2>Datos personales</h2>
+      <p>Información de identificación básica.</p>
+    </div>
+
+    <div class="field"><label>Nombre completo <span class="req">*</span></label><input type="text" id="nombre" placeholder="Nombre(s) y apellidos" /></div>
+
+    <div class="field-pair">
+      <div class="field"><label>Fecha de nacimiento <span class="req">*</span></label><input type="date" id="fecha_nac" /></div>
+      <div class="field"><label>Lugar de nacimiento</label><input type="text" id="lugar_nac" placeholder="Ciudad, Estado" /></div>
+    </div>
+
+    <div class="section-divider">Tipo de sangre y medidas</div>
+
+    <div class="field-trio">
+      <div class="field">
+        <label>Tipo de sangre</label>
+        <select id="tipo_sangre">
+          <option value="">— No sé —</option>
+          <option>A+</option><option>A−</option><option>B+</option><option>B−</option>
+          <option>AB+</option><option>AB−</option><option>O+</option><option>O−</option>
+        </select>
+      </div>
+      <div class="field"><label>Peso (kg)</label><input type="number" id="peso" placeholder="Ej. 78" min="20" max="300" /></div>
+      <div class="field"><label>Estatura (cm)</label><input type="number" id="estatura" placeholder="Ej. 170" min="50" max="250" /></div>
+    </div>
+
+    <div class="section-divider">Seguro y afiliación</div>
+
+    <div class="field-pair">
+      <div class="field"><label>Número de afiliación IMSS</label><input type="text" id="imss" placeholder="NSS" /></div>
+      <div class="field"><label>Seguro de gastos médicos mayores</label><input type="text" id="seguro_nombre" placeholder="Nombre de la aseguradora" /></div>
+    </div>
+    <div class="field-pair">
+      <div class="field"><label>Número de póliza</label><input type="text" id="seguro_poliza" placeholder="No. de póliza" /></div>
+      <div class="field"><label>Vigencia del seguro</label><input type="date" id="seguro_vigencia" /></div>
+    </div>
+
+    <div class="section-divider">Datos de contacto propios</div>
+
+    <div class="field"><label>Dirección actual</label><input type="text" id="direccion" placeholder="Calle, número, colonia, ciudad" /></div>
+    <div class="field-pair">
+      <div class="field"><label>Celular propio</label><input type="tel" id="celular" placeholder="+52 55 …" /></div>
+      <div class="field"><label>Email</label><input type="email" id="email" placeholder="correo@ejemplo.com" /></div>
+    </div>
+
+    <div class="section-divider">Voluntad anticipada</div>
+    <div class="field">
+      <label>Testimonio de voluntad anticipada (DNR)</label>
+      <div class="radio-group">
+        <label><input type="radio" name="dnr" value="No" checked /> No tengo</label>
+        <label><input type="radio" name="dnr" value="Sí — documento en casa" /> Sí, en casa</label>
+        <label><input type="radio" name="dnr" value="Sí — documento con médico" /> Sí, con mi médico</label>
+      </div>
+    </div>
+
+    <div class="nav-row">
+      <button class="btn btn-secondary" onclick="goTo(1)">← Atrás</button>
+      <button class="btn btn-primary" onclick="goTo(3)">Siguiente →</button>
+    </div>
+  </div>
+
+  <!-- ══ PASO 3: ANTECEDENTES ══ -->
+  <div id="step-3" class="screen">
+    <div class="progress-wrap">
+      <div class="progress-step done"></div>
+      <div class="progress-step done"></div>
+      <div class="progress-step done"></div>
+      <div class="progress-step"></div>
+      <div class="progress-step"></div>
+    </div>
+    <p class="progress-label">Paso 3 de 5</p>
+
+    <div class="step-head">
+      <h2>Antecedentes y enfermedades</h2>
+      <p>Información que los paramédicos necesitan para tratarte correctamente.</p>
+    </div>
+
+    <div class="field">
+      <label>Antecedentes familiares <span class="hint">Enfermedades hereditarias relevantes (diabetes, cardiopatías, cáncer…)</span></label>
+      <textarea id="antecedentes_fam" placeholder="Ej. padre con diabetes tipo 2, madre con hipertensión…"></textarea>
+    </div>
+
+    <div class="section-divider">Enfermedades actuales</div>
+    <div id="enfermedades-repeater">
+      <div class="repeater-item" data-index="0">
+        <div class="field-pair">
+          <div class="field"><label>Enfermedad / condición</label><input type="text" class="enf-nombre" placeholder="Ej. Diabetes tipo 2, Hipertensión…" /></div>
+          <div class="field"><label>Desde</label><input type="text" class="enf-desde" placeholder="Ej. 2015" /></div>
+        </div>
+      </div>
+    </div>
+    <button class="add-btn" onclick="addEnfermedad()">+ Agregar otra enfermedad</button>
+
+    <div class="section-divider">Alergias e intolerancias</div>
+    <div id="alergias-repeater">
+      <div class="repeater-item" data-index="0">
+        <div class="field-pair">
+          <div class="field"><label>Alergia / intolerancia <span class="req">*</span></label><input type="text" class="aler-nombre" placeholder="Ej. Penicilina, mariscos, latex…" /></div>
+          <div class="field"><label>Desde</label><input type="text" class="aler-desde" placeholder="Ej. desde niño, 2010…" /></div>
+        </div>
+      </div>
+    </div>
+    <button class="add-btn" onclick="addAlergia()">+ Agregar otra alergia</button>
+
+    <div class="nav-row">
+      <button class="btn btn-secondary" onclick="goTo(2)">← Atrás</button>
+      <button class="btn btn-primary" onclick="goTo(4)">Siguiente →</button>
+    </div>
+  </div>
+
+  <!-- ══ PASO 4: TRATAMIENTOS ══ -->
+  <div id="step-4" class="screen">
+    <div class="progress-wrap">
+      <div class="progress-step done"></div>
+      <div class="progress-step done"></div>
+      <div class="progress-step done"></div>
+      <div class="progress-step done"></div>
+      <div class="progress-step"></div>
+    </div>
+    <p class="progress-label">Paso 4 de 5</p>
+
+    <div class="step-head">
+      <h2>Tratamientos y operaciones</h2>
+      <p>Medicamentos, suplementos y cirugías previas.</p>
+    </div>
+
+    <div class="section-divider">Medicamentos actuales</div>
+    <div id="medicamentos-repeater">
+      <div class="repeater-item" data-index="0">
+        <div class="field-pair">
+          <div class="field"><label>Medicamento y dosis</label><input type="text" class="med-nombre" placeholder="Ej. Metformina 500mg" /></div>
+          <div class="field"><label>Padecimiento que trata</label><input type="text" class="med-padecimiento" placeholder="Ej. Prediabetes" /></div>
+        </div>
+        <div class="field-pair">
+          <div class="field"><label>Frecuencia</label><input type="text" class="med-freq" placeholder="Ej. 1 vez al día, cada 8hrs…" /></div>
+          <div class="field"><label>Desde</label><input type="text" class="med-desde" placeholder="Ej. 2020" /></div>
+        </div>
+      </div>
+    </div>
+    <button class="add-btn" onclick="addMedicamento()">+ Agregar otro medicamento</button>
+
+    <div class="section-divider">Complementos alimenticios y suplementos</div>
+    <div id="suplementos-repeater">
+      <div class="repeater-item" data-index="0">
+        <div class="field-pair">
+          <div class="field"><label>Suplemento / vitamina</label><input type="text" class="sup-nombre" placeholder="Ej. Omega 3, Vitamina D, Magnesio…" /></div>
+          <div class="field"><label>Dosis / frecuencia</label><input type="text" class="sup-dosis" placeholder="Ej. 1000mg diario" /></div>
+        </div>
+      </div>
+    </div>
+    <button class="add-btn" onclick="addSuplemento()">+ Agregar otro suplemento</button>
+
+    <div class="section-divider">Operaciones anteriores</div>
+    <div id="operaciones-repeater">
+      <div class="repeater-item" data-index="0">
+        <div class="field-pair">
+          <div class="field"><label>Operación / procedimiento</label><input type="text" class="op-nombre" placeholder="Ej. Bypass coronario, apendicectomía…" /></div>
+          <div class="field"><label>Año</label><input type="text" class="op-año" placeholder="Ej. 2019" /></div>
+        </div>
+      </div>
+    </div>
+    <button class="add-btn" onclick="addOperacion()">+ Agregar otra operación</button>
+
+    <div class="section-divider">Dispositivos médicos implantados</div>
+    <div class="field">
+      <label><span class="hint">Marcapasos, DAI, stent, bomba de insulina, prótesis…</span></label>
+      <input type="text" id="dispositivos" placeholder="Ej. Marcapasos Boston Scientific (2021), stent coronario. Escribe 'Ninguno' si no aplica." />
+    </div>
+
+    <div class="nav-row">
+      <button class="btn btn-secondary" onclick="goTo(3)">← Atrás</button>
+      <button class="btn btn-primary" onclick="goTo(5)">Siguiente →</button>
+    </div>
+  </div>
+
+  <!-- ══ PASO 5: MÉDICOS ══ -->
+  <div id="step-5" class="screen">
+    <div class="progress-wrap">
+      <div class="progress-step done"></div>
+      <div class="progress-step done"></div>
+      <div class="progress-step done"></div>
+      <div class="progress-step done"></div>
+      <div class="progress-step done"></div>
+    </div>
+    <p class="progress-label">Paso 5 de 5</p>
+
+    <div class="step-head">
+      <h2>Médicos actuales</h2>
+      <p>Un médico por especialidad o padecimiento.</p>
+    </div>
+
+    <div id="medicos-repeater">
+      <div class="repeater-item" data-index="0">
+        <div class="field-pair">
+          <div class="field"><label>Nombre del médico</label><input type="text" class="doc-nombre" placeholder="Dr. / Dra." /></div>
+          <div class="field"><label>Especialidad</label><input type="text" class="doc-esp" placeholder="Ej. Cardiólogo, Internista, Endocrinólogo…" /></div>
+        </div>
+        <div class="field-pair">
+          <div class="field"><label>Teléfono / consultorio</label><input type="tel" class="doc-tel" placeholder="+52 55 …" /></div>
+          <div class="field"><label>Padecimiento que atiende</label><input type="text" class="doc-pad" placeholder="Ej. Diabetes, Hipertensión…" /></div>
+        </div>
+      </div>
+    </div>
+    <button class="add-btn" onclick="addMedico()">+ Agregar otro médico</button>
+
+    <div class="field" style="margin-top:20px;">
+      <label>Notas adicionales <span class="hint">Cualquier otra información relevante para paramédicos.</span></label>
+      <textarea id="notas" placeholder="Ej. paciente vive solo, no habla inglés, tiene perro en casa…"></textarea>
+    </div>
+
+    <div class="nav-row">
+      <button class="btn btn-secondary" onclick="goTo(4)">← Atrás</button>
+      <button class="btn btn-primary" onclick="showPreview()">Revisar información →</button>
+    </div>
+  </div>
+
+  <!-- ══ VISTA PREVIA ══ -->
+  <div id="preview-screen" class="screen">
+    <div class="step-head" style="margin-top:20px;">
+      <h2>Revisa tu información</h2>
+      <p>Confirma que todo esté correcto antes de generar tu código QR.</p>
+    </div>
+    <div id="preview-content" class="preview-card"></div>
+    <div id="qr-density-note" style="font-family:sans-serif;font-size:.78rem;border-radius:8px;padding:10px 14px;margin:14px 0 4px;line-height:1.5;"></div>
+    <p style="font-family:sans-serif;font-size:.78rem;color:var(--ink-light);margin:12px 0 4px;">¿Algo está mal? Regresa y corrígelo.</p>
+    <div class="nav-row">
+      <button class="btn btn-secondary" onclick="goTo(5)">← Corregir</button>
+      <button class="btn btn-primary" style="background:#2d8a2d;" onclick="generateQR()">✅ Generar código QR</button>
+    </div>
+  </div>
+
+  <!-- ══ OUTPUT ══ -->
+  <div id="output-screen" class="screen">
+    <p style="font-size:1.15rem;font-weight:bold;margin:20px 0 4px;">✅ ¡Tu ficha médica está lista!</p>
+    <p style="font-family:sans-serif;font-size:.82rem;color:var(--ink-mid);margin-bottom:22px;">Elige cómo quieres guardarla.</p>
+
+    <div class="toggle-row">
+      <button class="btn active-view" id="btn-wallet-view" onclick="switchView('wallet')">💳 Tarjeta para imprimir</button>
+      <button class="btn" id="btn-ls-view" onclick="switchView('lockscreen')">📱 Pantalla de bloqueo</button>
+    </div>
+
+    <div id="print-zone">
+      <div id="wallet-card">
+        <div class="card-header">
+          <div class="card-cross">
+            <svg viewBox="0 0 22 22" fill="none"><rect x="9" y="2" width="4" height="18" rx="1" fill="white"/><rect x="2" y="9" width="18" height="4" rx="1" fill="white"/></svg>
+          </div>
+          <div>
+            <div class="card-title">FICHA MÉDICA DE EMERGENCIA</div>
+            <div class="card-subtitle">Escanea el código QR para ver toda la información</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div id="qr-container"></div>
+          <div class="card-info">
+            <div class="name" id="ci-nombre"></div>
+            <div class="row" id="ci-contacto-row"></div>
+            <div class="row"><strong>Nacimiento:</strong> <span id="ci-dob"></span></div>
+            <div class="row"><strong>Sangre:</strong> <span id="ci-sangre"></span></div>
+            <div class="allergy-row" id="ci-alergias"></div>
+          </div>
+        </div>
+        <div class="card-scan-hint">EN CASO DE EMERGENCIA — ESCANEAR CÓDIGO QR</div>
+      </div>
+    </div>
+
+    <div id="lockscreen-card">
+      <div class="ls-time" id="ls-time-display">9:41</div>
+      <div class="ls-date" id="ls-date-display">Miércoles, 1 de enero</div>
+      <div class="ls-alert">
+        <div class="ls-alert-title">🚨 Emergencia médica — Escanear</div>
+        <div class="ls-cross"><svg viewBox="0 0 22 22" fill="none"><rect x="9" y="2" width="4" height="18" rx="1" fill="white"/><rect x="2" y="9" width="18" height="4" rx="1" fill="white"/></svg></div>
+        <div id="ls-qr"></div>
+        <div class="ls-name" id="ls-nombre"></div>
+        <div class="ls-scan">Escanea para información médica</div>
+      </div>
+    </div>
+
+    <div class="action-section">
+      <div id="wallet-actions">
+        <h3>Tarjeta para imprimir</h3>
+        <button class="btn btn-big btn-green" onclick="printCard()">🖨️ Imprimir tarjeta ahora</button>
+        <button class="btn btn-big btn-secondary" onclick="downloadWallet()">⬇️ Descargar como imagen</button>
+      </div>
+      <div id="ls-actions" style="display:none;">
+        <h3>Pantalla de bloqueo</h3>
+        <button class="btn btn-big btn-blue" onclick="downloadLockscreen()">📱 Descargar imagen para celular</button>
+        <p style="font-family:sans-serif;font-size:.76rem;color:var(--ink-mid);margin-top:8px;line-height:1.5;">Guarda la imagen y ponla como fondo de pantalla de bloqueo de tu celular.</p>
+      </div>
+    </div>
+
+    <div class="restart-row"><button onclick="restart()">↩ Empezar de nuevo</button></div>
+  </div>
+
+</div><!-- /app -->
+
+<script>
+/* ══════════════════════════════════════════
+   NAVIGATION
+══════════════════════════════════════════ */
+function goTo(n) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  let target;
+  if (n === 'output')   target = document.getElementById('output-screen');
+  else if (n === 'preview') target = document.getElementById('preview-screen');
+  else target = document.getElementById('step-' + n);
+  if (target) target.classList.add('active');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* ══════════════════════════════════════════
+   REPEATER HELPERS
+══════════════════════════════════════════ */
+function makeRemoveBtn(onClick) {
+  const btn = document.createElement('button');
+  btn.className = 'remove-btn';
+  btn.textContent = '✕';
+  btn.onclick = onClick;
+  return btn;
+}
+
+function addContact() {
+  const wrap = document.getElementById('contacts-repeater');
+  const div = document.createElement('div');
+  div.className = 'repeater-item';
+  div.innerHTML = `
+    <div class="field-pair">
+      <div class="field"><label>Nombre</label><input type="text" class="c-nombre" placeholder="Nombre completo" /></div>
+      <div class="field"><label>Teléfono</label><input type="tel" class="c-tel" placeholder="+52 55 …" /></div>
+    </div>
+    <div class="field"><label>Parentesco / relación</label><input type="text" class="c-rel" placeholder="Ej. hija, vecino…" /></div>`;
+  div.appendChild(makeRemoveBtn(() => div.remove()));
+  wrap.appendChild(div);
+}
+
+function addEnfermedad() {
+  const wrap = document.getElementById('enfermedades-repeater');
+  const div = document.createElement('div');
+  div.className = 'repeater-item';
+  div.innerHTML = `
+    <div class="field-pair">
+      <div class="field"><label>Enfermedad / condición</label><input type="text" class="enf-nombre" placeholder="Ej. Colesterol alto…" /></div>
+      <div class="field"><label>Desde</label><input type="text" class="enf-desde" placeholder="Ej. 2018" /></div>
+    </div>`;
+  div.appendChild(makeRemoveBtn(() => div.remove()));
+  wrap.appendChild(div);
+}
+
+function addAlergia() {
+  const wrap = document.getElementById('alergias-repeater');
+  const div = document.createElement('div');
+  div.className = 'repeater-item';
+  div.innerHTML = `
+    <div class="field-pair">
+      <div class="field"><label>Alergia / intolerancia</label><input type="text" class="aler-nombre" placeholder="Ej. Ibuprofeno…" /></div>
+      <div class="field"><label>Desde</label><input type="text" class="aler-desde" placeholder="Ej. 2005" /></div>
+    </div>`;
+  div.appendChild(makeRemoveBtn(() => div.remove()));
+  wrap.appendChild(div);
+}
+
+function addMedicamento() {
+  const wrap = document.getElementById('medicamentos-repeater');
+  const div = document.createElement('div');
+  div.className = 'repeater-item';
+  div.innerHTML = `
+    <div class="field-pair">
+      <div class="field"><label>Medicamento y dosis</label><input type="text" class="med-nombre" placeholder="Ej. Losartán 50mg" /></div>
+      <div class="field"><label>Padecimiento que trata</label><input type="text" class="med-padecimiento" placeholder="Ej. Hipertensión" /></div>
+    </div>
+    <div class="field-pair">
+      <div class="field"><label>Frecuencia</label><input type="text" class="med-freq" placeholder="Ej. 1 vez al día" /></div>
+      <div class="field"><label>Desde</label><input type="text" class="med-desde" placeholder="Ej. 2018" /></div>
+    </div>`;
+  div.appendChild(makeRemoveBtn(() => div.remove()));
+  wrap.appendChild(div);
+}
+
+function addSuplemento() {
+  const wrap = document.getElementById('suplementos-repeater');
+  const div = document.createElement('div');
+  div.className = 'repeater-item';
+  div.innerHTML = `
+    <div class="field-pair">
+      <div class="field"><label>Suplemento / vitamina</label><input type="text" class="sup-nombre" placeholder="Ej. Vitamina C…" /></div>
+      <div class="field"><label>Dosis / frecuencia</label><input type="text" class="sup-dosis" placeholder="Ej. 500mg diario" /></div>
+    </div>`;
+  div.appendChild(makeRemoveBtn(() => div.remove()));
+  wrap.appendChild(div);
+}
+
+function addOperacion() {
+  const wrap = document.getElementById('operaciones-repeater');
+  const div = document.createElement('div');
+  div.className = 'repeater-item';
+  div.innerHTML = `
+    <div class="field-pair">
+      <div class="field"><label>Operación / procedimiento</label><input type="text" class="op-nombre" placeholder="Ej. Cateterismo…" /></div>
+      <div class="field"><label>Año</label><input type="text" class="op-año" placeholder="Ej. 2021" /></div>
+    </div>`;
+  div.appendChild(makeRemoveBtn(() => div.remove()));
+  wrap.appendChild(div);
+}
+
+function addMedico() {
+  const wrap = document.getElementById('medicos-repeater');
+  const div = document.createElement('div');
+  div.className = 'repeater-item';
+  div.innerHTML = `
+    <div class="field-pair">
+      <div class="field"><label>Nombre del médico</label><input type="text" class="doc-nombre" placeholder="Dr. / Dra." /></div>
+      <div class="field"><label>Especialidad</label><input type="text" class="doc-esp" placeholder="Ej. Cardiólogo…" /></div>
+    </div>
+    <div class="field-pair">
+      <div class="field"><label>Teléfono / consultorio</label><input type="tel" class="doc-tel" placeholder="+52 55 …" /></div>
+      <div class="field"><label>Padecimiento que atiende</label><input type="text" class="doc-pad" placeholder="Ej. Diabetes…" /></div>
+    </div>`;
+  div.appendChild(makeRemoveBtn(() => div.remove()));
+  wrap.appendChild(div);
+}
+
+/* ══════════════════════════════════════════
+   DATA COLLECTION
+══════════════════════════════════════════ */
+function collectData() {
+  // Contacts
+  const contacts = [];
+  document.querySelectorAll('#contacts-repeater .repeater-item').forEach(item => {
+    const n = item.querySelector('.c-nombre')?.value.trim();
+    const t = item.querySelector('.c-tel')?.value.trim();
+    const r = item.querySelector('.c-rel')?.value.trim();
+    if (n || t) contacts.push({ nombre: n, tel: t, rel: r });
+  });
+
+  // Enfermedades
+  const enfermedades = [];
+  document.querySelectorAll('#enfermedades-repeater .repeater-item').forEach(item => {
+    const n = item.querySelector('.enf-nombre')?.value.trim();
+    const d = item.querySelector('.enf-desde')?.value.trim();
+    if (n) enfermedades.push({ nombre: n, desde: d });
+  });
+
+  // Alergias
+  const alergias = [];
+  document.querySelectorAll('#alergias-repeater .repeater-item').forEach(item => {
+    const n = item.querySelector('.aler-nombre')?.value.trim();
+    const d = item.querySelector('.aler-desde')?.value.trim();
+    if (n) alergias.push({ nombre: n, desde: d });
+  });
+
+  // Medicamentos
+  const medicamentos = [];
+  document.querySelectorAll('#medicamentos-repeater .repeater-item').forEach(item => {
+    const n = item.querySelector('.med-nombre')?.value.trim();
+    const p = item.querySelector('.med-padecimiento')?.value.trim();
+    const f = item.querySelector('.med-freq')?.value.trim();
+    const d = item.querySelector('.med-desde')?.value.trim();
+    if (n) medicamentos.push({ nombre: n, padecimiento: p, frecuencia: f, desde: d });
+  });
+
+  // Suplementos
+  const suplementos = [];
+  document.querySelectorAll('#suplementos-repeater .repeater-item').forEach(item => {
+    const n = item.querySelector('.sup-nombre')?.value.trim();
+    const d = item.querySelector('.sup-dosis')?.value.trim();
+    if (n) suplementos.push({ nombre: n, dosis: d });
+  });
+
+  // Operaciones
+  const operaciones = [];
+  document.querySelectorAll('#operaciones-repeater .repeater-item').forEach(item => {
+    const n = item.querySelector('.op-nombre')?.value.trim();
+    const a = item.querySelector('.op-año')?.value.trim();
+    if (n) operaciones.push({ nombre: n, año: a });
+  });
+
+  // Médicos
+  const medicos = [];
+  document.querySelectorAll('#medicos-repeater .repeater-item').forEach(item => {
+    const n = item.querySelector('.doc-nombre')?.value.trim();
+    const e = item.querySelector('.doc-esp')?.value.trim();
+    const t = item.querySelector('.doc-tel')?.value.trim();
+    const p = item.querySelector('.doc-pad')?.value.trim();
+    if (n || e) medicos.push({ nombre: n, especialidad: e, tel: t, padecimiento: p });
+  });
+
+  return {
+    contacts,
+    nombre:          document.getElementById('nombre').value.trim(),
+    fecha_nac:       document.getElementById('fecha_nac').value,
+    lugar_nac:       document.getElementById('lugar_nac').value.trim(),
+    tipo_sangre:     document.getElementById('tipo_sangre').value,
+    peso:            document.getElementById('peso').value.trim(),
+    estatura:        document.getElementById('estatura').value.trim(),
+    imss:            document.getElementById('imss').value.trim(),
+    seguro_nombre:   document.getElementById('seguro_nombre').value.trim(),
+    seguro_poliza:   document.getElementById('seguro_poliza').value.trim(),
+    seguro_vigencia: document.getElementById('seguro_vigencia').value,
+    direccion:       document.getElementById('direccion').value.trim(),
+    celular:         document.getElementById('celular').value.trim(),
+    email:           document.getElementById('email').value.trim(),
+    dnr:             document.querySelector('input[name="dnr"]:checked')?.value || 'No',
+    antecedentes_fam: document.getElementById('antecedentes_fam').value.trim(),
+    enfermedades,
+    alergias,
+    medicamentos,
+    suplementos,
+    operaciones,
+    dispositivos:    document.getElementById('dispositivos').value.trim(),
+    medicos,
+    notas:           document.getElementById('notas').value.trim(),
+  };
+}
+
+/* ══════════════════════════════════════════
+   VALIDATE
+══════════════════════════════════════════ */
+function showError(msg, step) {
+  const old = document.getElementById('error-banner');
+  if (old) old.remove();
+  goTo(step);
+  setTimeout(() => {
+    const screen = (step === 'output' || step === 'preview')
+      ? document.getElementById(step + '-screen')
+      : document.getElementById('step-' + step);
+    const banner = document.createElement('div');
+    banner.id = 'error-banner';
+    banner.textContent = '⚠️ ' + msg;
+    const ref = screen.querySelector('.progress-label') || screen.querySelector('.step-head');
+    if (ref) ref.parentNode.insertBefore(banner, ref.nextSibling);
+    else screen.prepend(banner);
+    banner.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(() => banner.remove(), 6000);
+  }, 50);
+}
+
+function validate(data) {
+  if (!data.contacts.length || !data.contacts[0].nombre || !data.contacts[0].tel) {
+    showError('Ingresa al menos un contacto de emergencia con nombre y teléfono.', 1); return false;
+  }
+  if (!data.nombre) { showError('Falta el nombre completo (Paso 2).', 2); return false; }
+  if (!data.fecha_nac) { showError('Falta la fecha de nacimiento (Paso 2).', 2); return false; }
+  if (!data.alergias.length || !data.alergias[0].nombre) {
+    showError('Ingresa al menos una alergia, o escribe "Ninguna" (Paso 3).', 3); return false;
+  }
+  return true;
+}
+
+/* ══════════════════════════════════════════
+   FORMAT HELPERS
+══════════════════════════════════════════ */
+function fmtDate(iso) {
+  if (!iso) return '—';
+  const [y, m, d] = iso.split('-');
+  const months = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  return `${parseInt(d)} ${months[parseInt(m)-1]} ${y}`;
+}
+
+function tr(str, max) {
+  if (!str) return '';
+  str = str.replace(/\n/g, ' ').replace(/\s+/g, ' ').trim();
+  return str.length > max ? str.substring(0, max) + '..' : str;
+}
+
+/* ══════════════════════════════════════════
+   COMPACT / EXPAND
+   Shortens field names before QR encoding, and
+   expands them back after decoding. This alone
+   cuts a typical filled profile by roughly a
+   third, which matters directly for whether the
+   resulting QR code is dense enough to scan.
+   renderViewer() and showPreview() never see the
+   short keys — expandData() runs immediately
+   after decode, before anything else touches d.
+══════════════════════════════════════════ */
+function compactData(d) {
+  return {
+    n:   d.nombre,
+    fn:  d.fecha_nac,
+    ln:  d.lugar_nac,
+    ts:  d.tipo_sangre,
+    pe:  d.peso,
+    es:  d.estatura,
+    im:  d.imss,
+    sn:  d.seguro_nombre,
+    sp:  d.seguro_poliza,
+    sv:  d.seguro_vigencia,
+    di:  d.direccion,
+    ce:  d.celular,
+    em:  d.email,
+    dnr: d.dnr,
+    af:  d.antecedentes_fam,
+    de:  d.dispositivos,
+    no:  d.notas,
+    c:   (d.contacts || []).map(x => ({ n: x.nombre, t: x.tel, r: x.rel })),
+    en:  (d.enfermedades || []).map(x => ({ n: x.nombre, d: x.desde })),
+    al:  (d.alergias || []).map(x => ({ n: x.nombre, d: x.desde })),
+    me:  (d.medicamentos || []).map(x => ({ n: x.nombre, p: x.padecimiento, f: x.frecuencia, d: x.desde })),
+    su:  (d.suplementos || []).map(x => ({ n: x.nombre, d: x.dosis })),
+    op:  (d.operaciones || []).map(x => ({ n: x.nombre, a: x.año })),
+    md:  (d.medicos || []).map(x => ({ n: x.nombre, e: x.especialidad, t: x.tel, p: x.padecimiento })),
+  };
+}
+
+function expandData(c) {
+  return {
+    nombre:           c.n  || '',
+    fecha_nac:        c.fn || '',
+    lugar_nac:        c.ln || '',
+    tipo_sangre:      c.ts || '',
+    peso:             c.pe || '',
+    estatura:         c.es || '',
+    imss:             c.im || '',
+    seguro_nombre:    c.sn || '',
+    seguro_poliza:    c.sp || '',
+    seguro_vigencia:  c.sv || '',
+    direccion:        c.di || '',
+    celular:          c.ce || '',
+    email:            c.em || '',
+    dnr:              c.dnr || 'No',
+    antecedentes_fam: c.af || '',
+    dispositivos:     c.de || '',
+    notas:            c.no || '',
+    contacts:      (c.c  || []).map(x => ({ nombre: x.n, tel: x.t, rel: x.r })),
+    enfermedades:  (c.en || []).map(x => ({ nombre: x.n, desde: x.d })),
+    alergias:      (c.al || []).map(x => ({ nombre: x.n, desde: x.d })),
+    medicamentos:  (c.me || []).map(x => ({ nombre: x.n, padecimiento: x.p, frecuencia: x.f, desde: x.d })),
+    suplementos:   (c.su || []).map(x => ({ nombre: x.n, dosis: x.d })),
+    operaciones:   (c.op || []).map(x => ({ nombre: x.n, año: x.a })),
+    medicos:       (c.md || []).map(x => ({ nombre: x.n, especialidad: x.e, tel: x.t, padecimiento: x.p })),
+  };
+}
+
+/* ══════════════════════════════════════════
+   BUILD QR URL  (encodes compacted JSON in #hash)
+══════════════════════════════════════════ */
+let _lastQRText = '';
+
+function buildQRUrl(d) {
+  const json = JSON.stringify(compactData(d));
+  const b64  = btoa(unescape(encodeURIComponent(json)));
+  const base = window.location.href.split('#')[0].replace(/\/$/, '');
+  return base + '#' + b64;
+}
+
+/* ══════════════════════════════════════════
+   PREVIEW
+══════════════════════════════════════════ */
+function showPreview() {
+  const data = collectData();
+  if (!validate(data)) return;
+
+  function row(label, val) {
+    if (!val) return '';
+    return `<div class="preview-row"><span class="preview-label">${label}</span><span class="preview-val">${val}</span></div>`;
+  }
+  function listItems(arr) {
+    if (!arr.length) return '';
+    return '<ul class="preview-list">' + arr.map(i => `<li>${i}</li>`).join('') + '</ul>';
+  }
+
+  let html = '';
+
+  // Emergency contacts
+  html += `<div class="preview-section preview-emergency">
+    <div class="preview-section-title">🚨 Contacto de emergencia</div>`;
+  data.contacts.forEach(c => {
+    html += `<div class="preview-row"><span class="preview-label">${c.rel || 'Contacto'}</span><span class="preview-val"><strong>${c.nombre}</strong> — ${c.tel}</span></div>`;
+  });
+  html += `</div>`;
+
+  // Alergias
+  html += `<div class="preview-section preview-allergy">
+    <div class="preview-section-title">⚠️ Alergias e intolerancias</div>
+    <div class="preview-val-full">${data.alergias.map(a => a.nombre + (a.desde ? ` (desde ${a.desde})` : '')).join(' • ')}</div>
+  </div>`;
+
+  // Datos personales
+  html += `<div class="preview-section">
+    <div class="preview-section-title">👤 Datos personales</div>
+    ${row('Nombre', data.nombre)}
+    ${row('Nacimiento', fmtDate(data.fecha_nac))}
+    ${row('Lugar de nac.', data.lugar_nac)}
+    ${row('Tipo de sangre', data.tipo_sangre)}
+    ${row('Peso / Estatura', data.peso ? data.peso+'kg / '+(data.estatura||'?')+'cm' : '')}
+    ${row('IMSS', data.imss)}
+    ${row('Seguro médico', data.seguro_nombre ? data.seguro_nombre + (data.seguro_poliza ? ' — Póliza: '+data.seguro_poliza : '') + (data.seguro_vigencia ? ' — Vigencia: '+fmtDate(data.seguro_vigencia) : '') : '')}
+    ${row('DNR', data.dnr !== 'No' ? data.dnr : '')}
+    ${row('Celular', data.celular)}
+    ${row('Email', data.email)}
+  </div>`;
+
+  // Enfermedades
+  if (data.enfermedades.some(e => e.nombre)) {
+    html += `<div class="preview-section">
+      <div class="preview-section-title">🏥 Enfermedades actuales</div>
+      ${listItems(data.enfermedades.filter(e=>e.nombre).map(e => e.nombre + (e.desde ? ` — desde ${e.desde}` : '')))}
+    </div>`;
+  }
+
+  // Antecedentes
+  if (data.antecedentes_fam) {
+    html += `<div class="preview-section">
+      <div class="preview-section-title">🧬 Antecedentes familiares</div>
+      <div class="preview-val" style="font-family:sans-serif;font-size:.85rem;">${data.antecedentes_fam}</div>
+    </div>`;
+  }
+
+  // Medicamentos
+  if (data.medicamentos.some(m => m.nombre)) {
+    html += `<div class="preview-section">
+      <div class="preview-section-title">💊 Medicamentos</div>
+      ${listItems(data.medicamentos.filter(m=>m.nombre).map(m =>
+        m.nombre
+        + (m.padecimiento ? ` — ${m.padecimiento}` : '')
+        + (m.frecuencia ? ` — ${m.frecuencia}` : '')
+        + (m.desde ? ` (desde ${m.desde})` : '')
+      ))}
+    </div>`;
+  }
+
+  // Suplementos
+  if (data.suplementos.some(s => s.nombre)) {
+    html += `<div class="preview-section">
+      <div class="preview-section-title">🌿 Suplementos y vitaminas</div>
+      ${listItems(data.suplementos.filter(s=>s.nombre).map(s => s.nombre + (s.dosis ? ` — ${s.dosis}` : '')))}
+    </div>`;
+  }
+
+  // Operaciones
+  if (data.operaciones.some(o => o.nombre)) {
+    html += `<div class="preview-section">
+      <div class="preview-section-title">🔪 Operaciones anteriores</div>
+      ${listItems(data.operaciones.filter(o=>o.nombre).map(o => o.nombre + (o.año ? ` — ${o.año}` : '')))}
+    </div>`;
+  }
+
+  // Dispositivos
+  if (data.dispositivos) {
+    html += `<div class="preview-section">
+      <div class="preview-section-title">🔧 Dispositivos implantados</div>
+      <div class="preview-val" style="font-family:sans-serif;font-size:.85rem;">${data.dispositivos}</div>
+    </div>`;
+  }
+
+  // Médicos
+  if (data.medicos.some(m => m.nombre)) {
+    html += `<div class="preview-section">
+      <div class="preview-section-title">👨‍⚕️ Médicos</div>
+      ${listItems(data.medicos.filter(m=>m.nombre||m.especialidad).map(m =>
+        (m.nombre||'') + (m.especialidad ? ` — ${m.especialidad}` : '')
+        + (m.tel ? ` — ${m.tel}` : '')
+        + (m.padecimiento ? ` (${m.padecimiento})` : '')
+      ))}
+    </div>`;
+  }
+
+  // Notas
+  if (data.notas) {
+    html += `<div class="preview-section">
+      <div class="preview-section-title">📝 Notas adicionales</div>
+      <div class="preview-val" style="font-family:sans-serif;font-size:.85rem;">${data.notas}</div>
+    </div>`;
+  }
+
+  document.getElementById('preview-content').innerHTML = html;
+
+  // ── QR density feedback ──
+  // Uses the exact same compactData + base64 path buildQRUrl() will use,
+  // so this estimate matches what actually gets encoded.
+  const qrLen = buildQRUrl(data).length;
+  const note = document.getElementById('qr-density-note');
+  if (qrLen < 900) {
+    note.style.background = '#eaf4ea'; note.style.color = '#2e5e2e'; note.style.border = '1px solid #b8dab8';
+    note.innerHTML = '✅ <strong>Código QR:</strong> tamaño compacto, debería escanear con facilidad en la mayoría de condiciones.';
+  } else if (qrLen < 1500) {
+    note.style.background = '#fff8e6'; note.style.color = '#8a6d1a'; note.style.border = '1px solid #f0dca0';
+    note.innerHTML = '⚠️ <strong>Código QR:</strong> tamaño moderado. Debería escanear bien con buena luz y una cámara decente, pero prueba escanearlo tú mismo desde el teléfono antes de imprimir o laminar la tarjeta.';
+  } else {
+    note.style.background = '#fdf2f1'; note.style.color = '#962d22'; note.style.border = '1px solid #f0b8b3';
+    note.innerHTML = '⚠️ <strong>Código QR:</strong> el código será bastante denso por la cantidad de información. Es muy recomendable probarlo con 2-3 teléfonos distintos antes de imprimirlo, especialmente si se va a laminar o poner en un tamaño pequeño. Si falla al escanear, considera acortar las notas adicionales o los antecedentes familiares, que suelen ser los campos más largos.';
+  }
+
+  goTo('preview');
+}
+
+/* ══════════════════════════════════════════
+   QR GENERATION
+══════════════════════════════════════════ */
+function makeQR(containerId, text, size) {
+  const el = document.getElementById(containerId);
+  el.innerHTML = '';
+  try {
+    const qr = qrcode(0, 'M');
+    qr.addData(text);
+    qr.make();
+    const moduleCount = qr.getModuleCount();
+    const QUIET = Math.max(6, Math.round(size * 0.07));
+    const canvas = document.createElement('canvas');
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, size, size);
+    const innerSize = size - QUIET * 2;
+    const cell = innerSize / moduleCount;
+    ctx.fillStyle = '#000000';
+    for (let r = 0; r < moduleCount; r++)
+      for (let c = 0; c < moduleCount; c++)
+        if (qr.isDark(r,c))
+          ctx.fillRect(
+            QUIET + Math.floor(c * cell),
+            QUIET + Math.floor(r * cell),
+            Math.ceil(cell), Math.ceil(cell)
+          );
+    el.appendChild(canvas);
+  } catch(e) {
+    console.error('QR error:', e);
+    el.innerHTML = '<p style="color:red;font-size:11px">Error generando QR</p>';
+  }
+}
+
+function generateQR() {
+  const data = collectData();
+  if (!validate(data)) return;
+  const qrText = buildQRUrl(data);
+  _lastQRText = qrText;
+
+  // Wallet card info panel
+  document.getElementById('ci-nombre').textContent   = data.nombre;
+  document.getElementById('ci-dob').textContent      = fmtDate(data.fecha_nac);
+  document.getElementById('ci-sangre').textContent   = data.tipo_sangre || '—';
+  const c1 = data.contacts[0];
+  document.getElementById('ci-contacto-row').innerHTML =
+    `<strong>Emergencia:</strong> ${c1.nombre} ${c1.tel}`;
+  document.getElementById('ci-alergias').textContent =
+    '⚠ ALERGIAS: ' + (data.alergias.map(a=>a.nombre).join(', ') || 'Ninguna');
+
+  // Lockscreen
+  document.getElementById('ls-nombre').textContent = data.nombre;
+  const now = new Date();
+  document.getElementById('ls-time-display').textContent =
+    now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+  const dias  = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
+  const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  document.getElementById('ls-date-display').textContent =
+    `${dias[now.getDay()]}, ${now.getDate()} de ${meses[now.getMonth()]}`;
+
+  makeQR('qr-container', qrText, 500);
+  makeQR('ls-qr', qrText, 150);
+
+  goTo('output');
+  switchView('wallet');
+}
+
+/* ══════════════════════════════════════════
+   VIEW TOGGLE
+══════════════════════════════════════════ */
+function switchView(view) {
+  const wallet = document.getElementById('wallet-card');
+  const ls     = document.getElementById('lockscreen-card');
+  const wAct   = document.getElementById('wallet-actions');
+  const lAct   = document.getElementById('ls-actions');
+  const btnW   = document.getElementById('btn-wallet-view');
+  const btnL   = document.getElementById('btn-ls-view');
+  if (view === 'wallet') {
+    wallet.style.display = ''; ls.classList.remove('active');
+    wAct.style.display = ''; lAct.style.display = 'none';
+    btnW.classList.add('active-view'); btnL.classList.remove('active-view');
+  } else {
+    wallet.style.display = 'none'; ls.classList.add('active');
+    wAct.style.display = 'none'; lAct.style.display = '';
+    btnL.classList.add('active-view'); btnW.classList.remove('active-view');
+  }
+}
+
+/* ══════════════════════════════════════════
+   PRINT
+══════════════════════════════════════════ */
+function printCard() {
+  document.getElementById('wallet-card').style.display = '';
+  window.print();
+}
+
+/* ══════════════════════════════════════════
+   DOWNLOAD WALLET
+══════════════════════════════════════════ */
+function downloadWallet() {
+  const card = document.getElementById('wallet-card');
+  card.style.display = '';
+  html2canvas(card, { scale: 3, backgroundColor: '#ffffff', useCORS: true }).then(canvas => {
+    const link = document.createElement('a');
+    link.download = 'medqr-tarjeta.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  });
+}
+
+/* ══════════════════════════════════════════
+   DOWNLOAD LOCKSCREEN
+══════════════════════════════════════════ */
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y); ctx.closePath();
+}
+
+function downloadLockscreen() {
+  const W = 1170, H = 2532;
+  const out = document.createElement('canvas');
+  out.width = W; out.height = H;
+  const ctx = out.getContext('2d');
+
+  const grad = ctx.createLinearGradient(0,0,W*0.5,H);
+  grad.addColorStop(0,'#1a1a2e'); grad.addColorStop(0.6,'#16213e'); grad.addColorStop(1,'#0f3460');
+  ctx.fillStyle = grad; ctx.fillRect(0,0,W,H);
+
+  const CARD_W = 800, PADDING = 48, RADIUS = 60;
+  const CARD_TOP = Math.round(H * 0.38);
+
+  if (!_lastQRText) { alert('Genera el QR primero.'); return; }
+
+  const qr = qrcode(0,'L');
+  qr.addData(_lastQRText); qr.make();
+  const mc = qr.getModuleCount();
+  const QR_SIZE = 560;
+  const qrCanvas = document.createElement('canvas');
+  qrCanvas.width = qrCanvas.height = QR_SIZE;
+  const qc = qrCanvas.getContext('2d');
+  const cell = QR_SIZE / mc;
+  const LS_QUIET = Math.round(QR_SIZE * 0.06);
+  const LS_INNER = QR_SIZE - LS_QUIET * 2;
+  const lsCell = LS_INNER / mc;
+  qc.fillStyle = '#fff'; qc.fillRect(0,0,QR_SIZE,QR_SIZE);
+  qc.fillStyle = '#000';
+  for (let r=0;r<mc;r++) for (let c=0;c<mc;c++)
+    if (qr.isDark(r,c)) qc.fillRect(
+      LS_QUIET + Math.floor(c*lsCell),
+      LS_QUIET + Math.floor(r*lsCell),
+      Math.ceil(lsCell), Math.ceil(lsCell)
+    );
+
+  const TITLE_H=80, CROSS_R=44, CROSS_GAP=30, QR_GAP=30, NAME_H=60, HINT_H=44;
+  const CARD_H = PADDING*2 + TITLE_H + CROSS_GAP + CROSS_R*2 + QR_GAP + QR_SIZE + NAME_H + HINT_H + 20;
+  const CARD_X = (W - CARD_W) / 2;
+
+  ctx.save(); roundRect(ctx, CARD_X, CARD_TOP, CARD_W, CARD_H, RADIUS);
+  ctx.fillStyle = 'rgba(255,255,255,0.13)'; ctx.fill(); ctx.restore();
+
+  let y = CARD_TOP + PADDING;
+  ctx.fillStyle = 'rgba(255,255,255,0.80)';
+  ctx.font = 'bold 44px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText('🚨  EMERGENCIA MÉDICA — ESCANEAR', W/2, y+50);
+  y += TITLE_H + CROSS_GAP;
+
+  ctx.save(); ctx.beginPath(); ctx.arc(W/2, y+CROSS_R, CROSS_R, 0, Math.PI*2);
+  ctx.fillStyle = '#C0392B'; ctx.fill(); ctx.restore();
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(W/2-6, y+CROSS_R-26, 12, 52);
+  ctx.fillRect(W/2-26, y+CROSS_R-6, 52, 12);
+  y += CROSS_R*2 + QR_GAP;
+
+  const qrX = (W - QR_SIZE) / 2;
+  ctx.fillStyle = '#fff'; ctx.save(); roundRect(ctx, qrX-16, y-16, QR_SIZE+32, QR_SIZE+32, 20); ctx.fill(); ctx.restore();
+  ctx.drawImage(qrCanvas, qrX, y, QR_SIZE, QR_SIZE);
+  y += QR_SIZE + 32;
+
+  const nombre = document.getElementById('ci-nombre').textContent || '';
+  ctx.fillStyle = '#fff'; ctx.font = 'bold 52px sans-serif'; ctx.textAlign = 'center';
+  ctx.fillText(nombre, W/2, y+48);
+  y += NAME_H;
+
+  ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.font = '36px sans-serif';
+  ctx.fillText('Escanea para información médica', W/2, y+36);
+
+  const link = document.createElement('a');
+  link.download = 'medqr-pantalla-bloqueo.png';
+  link.href = out.toDataURL('image/png');
+  link.click();
+}
+
+/* ══════════════════════════════════════════
+   RESTART
+══════════════════════════════════════════ */
+function restart() {
+  if (!confirm('¿Seguro que quieres empezar de nuevo? Se borrarán todos los datos.')) return;
+  document.querySelectorAll('input[type="text"],input[type="date"],input[type="tel"],input[type="email"],input[type="number"],textarea')
+    .forEach(el => el.value = '');
+  document.querySelectorAll('select').forEach(el => el.selectedIndex = 0);
+  const dnrDef = document.querySelector('input[name="dnr"][value="No"]');
+  if (dnrDef) dnrDef.checked = true;
+  // Reset repeaters to single empty item
+  ['enfermedades','alergias','medicamentos','suplementos','operaciones','medicos'].forEach(id => {
+    const wrap = document.getElementById(id + '-repeater');
+    if (!wrap) return;
+    const first = wrap.querySelector('.repeater-item');
+    const extras = wrap.querySelectorAll('.repeater-item:not(:first-child)');
+    extras.forEach(e => e.remove());
+    if (first) first.querySelectorAll('input,textarea').forEach(el => el.value = '');
+  });
+  const contactsWrap = document.getElementById('contacts-repeater');
+  const extras = contactsWrap.querySelectorAll('.repeater-item:not(:first-child)');
+  extras.forEach(e => e.remove());
+  contactsWrap.querySelectorAll('input').forEach(el => el.value = '');
+  goTo(1);
+}
+
+/* ══════════════════════════════════════════
+   VIEWER — renders ficha when QR is scanned
+══════════════════════════════════════════ */
+function fmtDate(iso) {
+  if (!iso) return '—';
+  const [y, m, d] = iso.split('-');
+  const months = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  return parseInt(d) + ' ' + months[parseInt(m)-1] + ' ' + y;
+}
+
+function row(label, val) {
+  if (!val) return '';
+  return '<div class="v-row"><span class="v-label">' + label + '</span><span class="v-val">' + val + '</span></div>';
+}
+
+function listItems(arr, fn) {
+  if (!arr || !arr.length) return '';
+  return arr.map(i => {
+    const main = fn(i);
+    return main ? '<div class="v-list-item"><span>' + main + '</span></div>' : '';
+  }).join('');
+}
+
+function renderViewer(d) {
+  // Hide everything else, show viewer
+  document.querySelector('.privacy-banner').style.display = 'none';
+  document.querySelectorAll('.screen').forEach(s => s.style.display = 'none');
+  const vs = document.getElementById('viewer-screen');
+  vs.style.display = 'block';
+
+  // Elaboration date
+  const now = new Date();
+  const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  document.getElementById('v-elaboracion').textContent =
+    'Actualizado: ' + now.getDate() + ' de ' + meses[now.getMonth()] + ' de ' + now.getFullYear();
+
+  let html = '';
+
+  // ── EMERGENCY CONTACT ──
+  if (d.contacts && d.contacts.length) {
+    html += '<div class="v-section v-emergency"><div class="v-section-inner">';
+    html += '<div class="v-section-title">🚨 Contacto de emergencia — LLAMAR PRIMERO</div>';
+    d.contacts.forEach(c => {
+      html += '<div class="v-contact-row">';
+      if (c.rel) html += '<span class="v-contact-rel">' + c.rel + ' — </span>';
+      html += '<span class="v-contact-name">' + (c.nombre||'') + '</span> ';
+      html += '<span class="v-contact-tel">📞 ' + (c.tel||'') + '</span>';
+      html += '</div>';
+    });
+    html += '</div></div>';
+  }
+
+  // ── ALERGIAS ──
+  if (d.alergias && d.alergias.some(a => a.nombre)) {
+    html += '<div class="v-section v-allergy"><div class="v-section-inner">';
+    html += '<div class="v-section-title">⚠️ Alergias e intolerancias — CRÍTICO</div>';
+    html += '<div class="v-allergy-text">';
+    html += d.alergias.filter(a=>a.nombre).map(a => a.nombre + (a.desde ? ' (desde ' + a.desde + ')' : '')).join(' &bull; ');
+    html += '</div></div></div>';
+  }
+
+  // ── DATOS PERSONALES ──
+  html += '<div class="v-section"><div class="v-section-inner">';
+  html += '<div class="v-section-title">👤 Datos personales</div>';
+  html += row('Nombre', d.nombre);
+  html += row('Nacimiento', fmtDate(d.fecha_nac));
+  html += row('Lugar de nac.', d.lugar_nac);
+  html += row('Tipo de sangre', d.tipo_sangre);
+  if (d.peso || d.estatura) html += row('Peso / Estatura', (d.peso||'?') + 'kg / ' + (d.estatura||'?') + 'cm');
+  html += row('IMSS', d.imss);
+  if (d.seguro_nombre) {
+    let seg = d.seguro_nombre;
+    if (d.seguro_poliza)  seg += ' — Póliza: ' + d.seguro_poliza;
+    if (d.seguro_vigencia) seg += ' — Vigencia: ' + fmtDate(d.seguro_vigencia);
+    html += row('Seguro médico', seg);
+  }
+  if (d.dnr && d.dnr !== 'No') html += row('Vol. anticipada', d.dnr);
+  html += row('Celular', d.celular);
+  html += row('Email', d.email);
+  html += row('Dirección', d.direccion);
+  html += '</div></div>';
+
+  // ── ENFERMEDADES ──
+  if (d.enfermedades && d.enfermedades.some(e=>e.nombre)) {
+    html += '<div class="v-section"><div class="v-section-inner">';
+    html += '<div class="v-section-title">🏥 Enfermedades actuales</div>';
+    html += '<div class="v-list">';
+    html += listItems(d.enfermedades.filter(e=>e.nombre), e =>
+      '<strong>' + e.nombre + '</strong>' + (e.desde ? ' <span class="v-list-sub">— desde ' + e.desde + '</span>' : '')
+    );
+    html += '</div></div></div>';
+  }
+
+  // ── ANTECEDENTES ──
+  if (d.antecedentes_fam) {
+    html += '<div class="v-section"><div class="v-section-inner">';
+    html += '<div class="v-section-title">🧬 Antecedentes familiares</div>';
+    html += '<div style="font-family:sans-serif;font-size:.88rem;line-height:1.6;color:var(--ink)">' + d.antecedentes_fam + '</div>';
+    html += '</div></div>';
+  }
+
+  // ── MEDICAMENTOS ──
+  if (d.medicamentos && d.medicamentos.some(m=>m.nombre)) {
+    html += '<div class="v-section"><div class="v-section-inner">';
+    html += '<div class="v-section-title">💊 Medicamentos actuales</div>';
+    html += '<div class="v-list">';
+    html += listItems(d.medicamentos.filter(m=>m.nombre), m => {
+      let s = '<strong>' + m.nombre + '</strong>';
+      if (m.padecimiento) s += ' <span class="v-list-sub">— ' + m.padecimiento + '</span>';
+      if (m.frecuencia)   s += ' <span class="v-list-sub">— ' + m.frecuencia + '</span>';
+      if (m.desde)        s += ' <span class="v-list-sub">(desde ' + m.desde + ')</span>';
+      return s;
+    });
+    html += '</div></div></div>';
+  }
+
+  // ── SUPLEMENTOS ──
+  if (d.suplementos && d.suplementos.some(s=>s.nombre)) {
+    html += '<div class="v-section"><div class="v-section-inner">';
+    html += '<div class="v-section-title">🌿 Suplementos y vitaminas</div>';
+    html += '<div class="v-list">';
+    html += listItems(d.suplementos.filter(s=>s.nombre), s =>
+      '<strong>' + s.nombre + '</strong>' + (s.dosis ? ' <span class="v-list-sub">— ' + s.dosis + '</span>' : '')
+    );
+    html += '</div></div></div>';
+  }
+
+  // ── OPERACIONES ──
+  if (d.operaciones && d.operaciones.some(o=>o.nombre)) {
+    html += '<div class="v-section"><div class="v-section-inner">';
+    html += '<div class="v-section-title">🔪 Operaciones anteriores</div>';
+    html += '<div class="v-list">';
+    html += listItems(d.operaciones.filter(o=>o.nombre), o =>
+      '<strong>' + o.nombre + '</strong>' + (o.año ? ' <span class="v-list-sub">— ' + o.año + '</span>' : '')
+    );
+    html += '</div></div></div>';
+  }
+
+  // ── DISPOSITIVOS ──
+  if (d.dispositivos) {
+    html += '<div class="v-section"><div class="v-section-inner">';
+    html += '<div class="v-section-title">🔧 Dispositivos implantados</div>';
+    html += '<div style="font-family:sans-serif;font-size:.88rem;color:var(--ink)">' + d.dispositivos + '</div>';
+    html += '</div></div>';
+  }
+
+  // ── MÉDICOS ──
+  if (d.medicos && d.medicos.some(m=>m.nombre)) {
+    html += '<div class="v-section"><div class="v-section-inner">';
+    html += '<div class="v-section-title">👨‍⚕️ Médicos actuales</div>';
+    html += '<div class="v-list">';
+    html += listItems(d.medicos.filter(m=>m.nombre||m.especialidad), m => {
+      let s = '<strong>' + (m.nombre||'') + '</strong>';
+      if (m.especialidad)  s += ' <span class="v-list-sub">— ' + m.especialidad + '</span>';
+      if (m.tel)           s += ' <span class="v-list-sub">📞 ' + m.tel + '</span>';
+      if (m.padecimiento)  s += ' <span class="v-list-sub">(' + m.padecimiento + ')</span>';
+      return s;
+    });
+    html += '</div></div></div>';
+  }
+
+  // ── NOTAS ──
+  if (d.notas) {
+    html += '<div class="v-section"><div class="v-section-inner">';
+    html += '<div class="v-section-title">📝 Notas adicionales</div>';
+    html += '<div style="font-family:sans-serif;font-size:.88rem;line-height:1.6;color:var(--ink)">' + d.notas + '</div>';
+    html += '</div></div>';
+  }
+
+  // ── FECHA ELABORACIÓN ──
+  html += '<div class="v-fecha">Ficha generada con MedQR — gonzalocortes.com/medqr</div>';
+
+  document.getElementById('viewer-body').innerHTML = html;
+}
+
+/* ══════════════════════════════════════════
+   STARTUP — check for hash data
+══════════════════════════════════════════ */
+(function() {
+  const hash = window.location.hash.slice(1);
+  if (!hash) return; // normal form mode
+  try {
+    const json = decodeURIComponent(escape(atob(hash)));
+    const compact = JSON.parse(json);
+    const data = expandData(compact);
+    // Wait for DOM
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => renderViewer(data));
+    } else {
+      renderViewer(data);
+    }
+  } catch(e) {
+    console.warn('MedQR: could not parse hash data', e);
+  }
+})();
+
+</script>
+</body>
+</html>
