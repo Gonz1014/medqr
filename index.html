@@ -117,26 +117,6 @@
     .card-info .allergy-row { margin-top: 8px; background: #fff3f3; border: 1px solid #f8c8c8; border-radius: 5px; padding: 6px 12px; color: var(--red); font-weight: 600; font-size: 1rem; }
     .card-scan-hint { text-align: center; font-family: sans-serif; font-size: .64rem; color: var(--ink-light); margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--rule); }
 
-    /* LOCKSCREEN PREVIEW */
-    #lockscreen-card { background: linear-gradient(160deg,#1a1a2e 0%,#16213e 60%,#0f3460 100%); border-radius: 32px; padding: 36px 24px 32px; max-width: 210px; margin: 0 auto 26px; text-align: center; color: var(--white); box-shadow: 0 8px 32px rgba(0,0,0,.35); display: none; }
-    #lockscreen-card.active { display: block; }
-    .ls-time { font-size: 2.4rem; font-weight: 300; margin-bottom: 2px; }
-    .ls-date { font-size: .72rem; opacity: .7; font-family: sans-serif; margin-bottom: 16px; }
-    .ls-alert { background: rgba(255,255,255,.12); border-radius: 14px; padding: 12px 10px; }
-    .ls-alert-title { font-size: .62rem; font-weight: 700; letter-spacing: .1em; opacity: .8; font-family: sans-serif; text-transform: uppercase; margin-bottom: 6px; }
-    .ls-cross { width: 32px; height: 32px; background: var(--red); border-radius: 50%; display: grid; place-items: center; margin: 0 auto 7px; }
-    .ls-cross svg { width: 18px; height: 18px; }
-    #ls-qr { display: flex; justify-content: center; margin: 8px 0 7px; }
-    #ls-qr canvas { border-radius: 6px; }
-    .ls-name { font-size: .76rem; font-weight: 700; margin-bottom: 2px; }
-    .ls-scan { font-size: .6rem; opacity: .6; font-family: sans-serif; }
-
-    /* TOGGLE */
-    .toggle-row { display: flex; gap: 10px; margin-bottom: 16px; }
-    .toggle-row .btn { flex: 1; padding: 10px; font-size: .86rem; }
-    .toggle-row .btn.active-view { background: var(--red); color: var(--white); border-color: var(--red); }
-    .toggle-row .btn:not(.active-view) { background: var(--white); color: var(--ink); border: 1.5px solid var(--rule); }
-
     /* PREVIEW CARD */
     .preview-card { background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; margin-bottom: 16px; }
     .preview-section { padding: 12px 16px; border-bottom: 1px solid var(--rule); }
@@ -509,12 +489,7 @@
   <!-- ══ OUTPUT ══ -->
   <div id="output-screen" class="screen">
     <p style="font-size:1.15rem;font-weight:bold;margin:20px 0 4px;">✅ ¡Tu ficha médica está lista!</p>
-    <p style="font-family:sans-serif;font-size:.82rem;color:var(--ink-mid);margin-bottom:22px;">Elige cómo quieres guardarla.</p>
-
-    <div class="toggle-row">
-      <button class="btn active-view" id="btn-wallet-view" onclick="switchView('wallet')">💳 Tarjeta para imprimir</button>
-      <button class="btn" id="btn-ls-view" onclick="switchView('lockscreen')">📱 Pantalla de bloqueo</button>
-    </div>
+    <p style="font-family:sans-serif;font-size:.82rem;color:var(--ink-mid);margin-bottom:22px;">Tu tarjeta para imprimir, lista para descargar.</p>
 
     <div id="print-zone">
       <div id="wallet-card">
@@ -541,28 +516,11 @@
       </div>
     </div>
 
-    <div id="lockscreen-card">
-      <div class="ls-time" id="ls-time-display">9:41</div>
-      <div class="ls-date" id="ls-date-display">Miércoles, 1 de enero</div>
-      <div class="ls-alert">
-        <div class="ls-alert-title">🚨 Emergencia médica — Escanear</div>
-        <div class="ls-cross"><svg viewBox="0 0 22 22" fill="none"><rect x="9" y="2" width="4" height="18" rx="1" fill="white"/><rect x="2" y="9" width="18" height="4" rx="1" fill="white"/></svg></div>
-        <div id="ls-qr"></div>
-        <div class="ls-name" id="ls-nombre"></div>
-        <div class="ls-scan">Escanea para información médica</div>
-      </div>
-    </div>
-
     <div class="action-section">
       <div id="wallet-actions">
         <h3>Tarjeta para imprimir</h3>
         <button class="btn btn-big btn-green" onclick="printCard()">🖨️ Imprimir tarjeta ahora</button>
         <button class="btn btn-big btn-secondary" onclick="downloadWallet()">⬇️ Descargar como imagen</button>
-      </div>
-      <div id="ls-actions" style="display:none;">
-        <h3>Pantalla de bloqueo</h3>
-        <button class="btn btn-big btn-blue" onclick="downloadLockscreen()">📱 Descargar imagen para celular</button>
-        <p style="font-family:sans-serif;font-size:.76rem;color:var(--ink-mid);margin-top:8px;line-height:1.5;">Guarda la imagen y ponla como fondo de pantalla de bloqueo de tu celular.</p>
       </div>
     </div>
 
@@ -1129,42 +1087,17 @@ function generateQR() {
   document.getElementById('ci-alergias').textContent =
     '⚠ ALERGIAS: ' + (data.alergias.map(a=>a.nombre).join(', ') || 'Ninguna');
 
-  // Lockscreen
-  document.getElementById('ls-nombre').textContent = data.nombre;
-  const now = new Date();
-  document.getElementById('ls-time-display').textContent =
-    now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
-  const dias  = ['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
-  const meses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
-  document.getElementById('ls-date-display').textContent =
-    `${dias[now.getDay()]}, ${now.getDate()} de ${meses[now.getMonth()]}`;
-
   makeQR('qr-container', qrText, 500);
-  makeQR('ls-qr', qrText, 150);
 
   goTo('output');
-  switchView('wallet');
+  showWalletView();
 }
 
 /* ══════════════════════════════════════════
-   VIEW TOGGLE
+   SHOW WALLET VIEW
 ══════════════════════════════════════════ */
-function switchView(view) {
-  const wallet = document.getElementById('wallet-card');
-  const ls     = document.getElementById('lockscreen-card');
-  const wAct   = document.getElementById('wallet-actions');
-  const lAct   = document.getElementById('ls-actions');
-  const btnW   = document.getElementById('btn-wallet-view');
-  const btnL   = document.getElementById('btn-ls-view');
-  if (view === 'wallet') {
-    wallet.style.display = ''; ls.classList.remove('active');
-    wAct.style.display = ''; lAct.style.display = 'none';
-    btnW.classList.add('active-view'); btnL.classList.remove('active-view');
-  } else {
-    wallet.style.display = 'none'; ls.classList.add('active');
-    wAct.style.display = 'none'; lAct.style.display = '';
-    btnL.classList.add('active-view'); btnW.classList.remove('active-view');
-  }
+function showWalletView() {
+  document.getElementById('wallet-card').style.display = '';
 }
 
 /* ══════════════════════════════════════════
@@ -1187,91 +1120,6 @@ function downloadWallet() {
     link.href = canvas.toDataURL('image/png');
     link.click();
   });
-}
-
-/* ══════════════════════════════════════════
-   DOWNLOAD LOCKSCREEN
-══════════════════════════════════════════ */
-function roundRect(ctx, x, y, w, h, r) {
-  ctx.beginPath();
-  ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
-  ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
-  ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
-  ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y); ctx.closePath();
-}
-
-function downloadLockscreen() {
-  const W = 1170, H = 2532;
-  const out = document.createElement('canvas');
-  out.width = W; out.height = H;
-  const ctx = out.getContext('2d');
-
-  const grad = ctx.createLinearGradient(0,0,W*0.5,H);
-  grad.addColorStop(0,'#1a1a2e'); grad.addColorStop(0.6,'#16213e'); grad.addColorStop(1,'#0f3460');
-  ctx.fillStyle = grad; ctx.fillRect(0,0,W,H);
-
-  const CARD_W = 800, PADDING = 48, RADIUS = 60;
-  const CARD_TOP = Math.round(H * 0.38);
-
-  if (!_lastQRText) { alert('Genera el QR primero.'); return; }
-
-  const qr = qrcode(0,'L');
-  qr.addData(_lastQRText); qr.make();
-  const mc = qr.getModuleCount();
-  const QR_SIZE = 560;
-  const qrCanvas = document.createElement('canvas');
-  qrCanvas.width = qrCanvas.height = QR_SIZE;
-  const qc = qrCanvas.getContext('2d');
-  const cell = QR_SIZE / mc;
-  const LS_QUIET = Math.round(QR_SIZE * 0.06);
-  const LS_INNER = QR_SIZE - LS_QUIET * 2;
-  const lsCell = LS_INNER / mc;
-  qc.fillStyle = '#fff'; qc.fillRect(0,0,QR_SIZE,QR_SIZE);
-  qc.fillStyle = '#000';
-  for (let r=0;r<mc;r++) for (let c=0;c<mc;c++)
-    if (qr.isDark(r,c)) qc.fillRect(
-      LS_QUIET + Math.floor(c*lsCell),
-      LS_QUIET + Math.floor(r*lsCell),
-      Math.ceil(lsCell), Math.ceil(lsCell)
-    );
-
-  const TITLE_H=80, CROSS_R=44, CROSS_GAP=30, QR_GAP=30, NAME_H=60, HINT_H=44;
-  const CARD_H = PADDING*2 + TITLE_H + CROSS_GAP + CROSS_R*2 + QR_GAP + QR_SIZE + NAME_H + HINT_H + 20;
-  const CARD_X = (W - CARD_W) / 2;
-
-  ctx.save(); roundRect(ctx, CARD_X, CARD_TOP, CARD_W, CARD_H, RADIUS);
-  ctx.fillStyle = 'rgba(255,255,255,0.13)'; ctx.fill(); ctx.restore();
-
-  let y = CARD_TOP + PADDING;
-  ctx.fillStyle = 'rgba(255,255,255,0.80)';
-  ctx.font = 'bold 44px sans-serif'; ctx.textAlign = 'center';
-  ctx.fillText('🚨  EMERGENCIA MÉDICA — ESCANEAR', W/2, y+50);
-  y += TITLE_H + CROSS_GAP;
-
-  ctx.save(); ctx.beginPath(); ctx.arc(W/2, y+CROSS_R, CROSS_R, 0, Math.PI*2);
-  ctx.fillStyle = '#C0392B'; ctx.fill(); ctx.restore();
-  ctx.fillStyle = '#fff';
-  ctx.fillRect(W/2-6, y+CROSS_R-26, 12, 52);
-  ctx.fillRect(W/2-26, y+CROSS_R-6, 52, 12);
-  y += CROSS_R*2 + QR_GAP;
-
-  const qrX = (W - QR_SIZE) / 2;
-  ctx.fillStyle = '#fff'; ctx.save(); roundRect(ctx, qrX-16, y-16, QR_SIZE+32, QR_SIZE+32, 20); ctx.fill(); ctx.restore();
-  ctx.drawImage(qrCanvas, qrX, y, QR_SIZE, QR_SIZE);
-  y += QR_SIZE + 32;
-
-  const nombre = document.getElementById('ci-nombre').textContent || '';
-  ctx.fillStyle = '#fff'; ctx.font = 'bold 52px sans-serif'; ctx.textAlign = 'center';
-  ctx.fillText(nombre, W/2, y+48);
-  y += NAME_H;
-
-  ctx.fillStyle = 'rgba(255,255,255,0.55)'; ctx.font = '36px sans-serif';
-  ctx.fillText('Escanea para información médica', W/2, y+36);
-
-  const link = document.createElement('a');
-  link.download = 'medqr-pantalla-bloqueo.png';
-  link.href = out.toDataURL('image/png');
-  link.click();
 }
 
 /* ══════════════════════════════════════════
