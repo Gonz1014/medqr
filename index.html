@@ -1047,6 +1047,23 @@ function showPreview() {
   // so this estimate matches what actually gets encoded.
   const qrLen = buildQRUrl(data).length;
   const note = document.getElementById('qr-density-note');
+
+  // ── file:// guard ──
+  // If this page is open as a local file, window.location.href is something
+  // like file:///Users/you/Downloads/index.html. That path only exists on
+  // THIS computer. buildQRUrl() would bake it straight into the QR, and any
+  // other phone that scans it gets a dead link -- the scan succeeds, but
+  // there's nothing at that address on their device. This is a different
+  // (and worse) problem than density: no amount of shrinking the payload
+  // fixes it, so it gets its own blocking banner instead of blending into
+  // the density tiers below.
+  if (window.location.protocol === 'file:') {
+    note.style.background = '#fdf2f1'; note.style.color = '#962d22'; note.style.border = '2px solid #d9534f';
+    note.innerHTML = '🚫 <strong>Este código QR NO va a funcionar.</strong> Estás viendo esta página como un archivo local en tu computadora (la dirección empieza con "file://"), así que el código QR va a apuntar a un archivo que solo existe en tu computadora — ningún otro teléfono podrá abrirlo. Sube este sitio a GitHub Pages (o cualquier hosting) y genera el código QR desde la dirección real (https://...) antes de usarlo.';
+    goTo('preview');
+    return;
+  }
+
   if (qrLen < 900) {
     note.style.background = '#eaf4ea'; note.style.color = '#2e5e2e'; note.style.border = '1px solid #b8dab8';
     note.innerHTML = '✅ <strong>Código QR:</strong> tamaño compacto, debería escanear con facilidad en la mayoría de condiciones.';
